@@ -1,0 +1,25 @@
+# Node
+node_modules/
+dist/
+
+# Rust
+src-tauri/target/
+
+# Build outputs
+*.exe
+*.msi
+*.nsis
+
+# Logs / benchmarks data
+benchmarks/*.json
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Fix scripts (one-time, removed)
+fix_*.py
+
+# Tauri generated
+src-tauri/gen/

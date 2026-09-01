@@ -1,0 +1,198 @@
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI", -apple-system, sans-serif;
+}
+
+/* =========================================
+   WinOptimizer — Dark Glassmorphism Theme
+   Reference: HyperLis (dark)
+   ========================================= */
+
+#root {
+  background: radial-gradient(ellipse at 30% -10%, #232b4d 0%, #141a30 45%, #0b0f1e 100%);
+  min-height: 100vh;
+  color: #e2e8f0;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Ambient glow blobs */
+#root::before {
+  content: "";
+  position: fixed;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.16), transparent 70%);
+  top: -140px;
+  right: -100px;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+}
+#root::after {
+  content: "";
+  position: fixed;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.14), transparent 70%);
+  bottom: -160px;
+  left: -80px;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body {
+  background: transparent;
+  color: #e2e8f0;
+}
+
+/* =========================================
+   Layout
+   ========================================= */
+.ant-layout {
+  background: transparent !important;
+}
+.ant-layout-sider {
+  background: rgba(20, 26, 48, 0.55) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  z-index: 2;
+}
+.ant-layout-header {
+  background: rgba(20, 26, 48, 0.5) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+  z-index: 2;
+}
+.ant-layout-content {
+  background: transparent !important;
+  overflow-y: auto;
+}
+
+/* =========================================
+   Dark glass cards
+   ========================================= */
+.ant-card {
+  background: rgba(30, 38, 68, 0.62) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.ant-card:hover {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+.ant-card-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.ant-card-head-title {
+  color: #e2e8f0 !important;
+  font-weight: 600;
+}
+.ant-card-body {
+  padding: 16px !important;
+}
+
+/* =========================================
+   Sidebar menu (dark)
+   ========================================= */
+.ant-menu-dark, .ant-menu-dark .ant-menu-sub {
+  background: transparent !important;
+}
+.ant-menu-dark .ant-menu-item {
+  color: rgba(226, 232, 240, 0.75) !important;
+  border-radius: 10px !important;
+  margin: 4px 10px;
+  height: 42px;
+  line-height: 42px;
+  transition: all 0.2s ease;
+}
+.ant-menu-dark .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+.ant-menu-dark .ant-menu-item-selected {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(139, 92, 246, 0.3)) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.18);
+}
+.ant-menu-dark .ant-menu-item-selected .ant-menu-item-icon {
+  color: #93c5fd !important;
+}
+.ant-menu-dark .ant-menu-item .ant-menu-item-icon {
+  color: rgba(148, 163, 184, 0.9) !important;
+  transition: color 0.2s;
+}
+
+/* =========================================
+   Typography
+   ========================================= */
+.ant-statistic-title {
+  color: rgba(148, 163, 184, 0.95) !important;
+  font-size: 12px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.ant-statistic-content {
+  color: #f1f5f9 !important;
+  font-weight: 700;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* =========================================
+   Custom dashboard bits
+   ========================================= */
+.dash-card-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+.dash-card-sub {
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.9);
+  margin-top: 6px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(148, 163, 184, 0.95);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+.dash-card-title .anticon {
+  font-size: 14px;
+}

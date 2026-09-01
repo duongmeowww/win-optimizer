@@ -1,0 +1,32 @@
+{
+  "name": "win-optimizer",
+  "version": "0.1.0",
+  "description": "Windows Optimization App",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "antd": "^6.6.2",
+    "i18next": "^26.4.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.12",
+    "react-router-dom": "^7.18.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

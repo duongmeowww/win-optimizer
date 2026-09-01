@@ -1,0 +1,16 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// Vite config for Tauri (fixed port, clearScreen disabled for Tauri)
+export default defineConfig({
+  plugins: [react()],
+  clearScreen: false,
+  server: {
+    port: 1420,
+    strictPort: true,
+  },
+  build: {
+    target: "es2021",
+    outDir: "dist",
+  },
+});

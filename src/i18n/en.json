@@ -1,0 +1,23 @@
+{
+  "app": {
+    "title": "WinOptimizer"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "disk": "Disk Cleaner",
+    "debloat": "Debloat",
+    "memory": "Memory Cleaner",
+    "services": "Services & Startup",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "System Overview",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "disk": "Disk",
+    "gpu": "GPU",
+    "health": "Health Score",
+    "uptime": "Uptime",
+    "os": "Operating System"
+  }
+}

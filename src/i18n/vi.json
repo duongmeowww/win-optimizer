@@ -1,0 +1,23 @@
+{
+  "app": {
+    "title": "WinOptimizer"
+  },
+  "nav": {
+    "dashboard": "Tổng quan",
+    "disk": "Dọn rác",
+    "debloat": "Debloat",
+    "memory": "Dọn RAM",
+    "services": "Dịch vụ & Khởi động",
+    "settings": "Cài đặt"
+  },
+  "dashboard": {
+    "title": "Tổng quan hệ thống",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "disk": "Ổ đĩa",
+    "gpu": "GPU",
+    "health": "Điểm sức khỏe",
+    "uptime": "Thời gian hoạt động",
+    "os": "Hệ điều hành"
+  }
+}
