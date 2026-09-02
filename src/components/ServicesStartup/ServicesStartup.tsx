@@ -1,7 +1,7 @@
 import { Card, Empty, Table, Switch, Space, Tag, Typography, Button, Modal } from "antd";
 import { ReloadOutlined, ThunderboltOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface ServiceStartupItem {
@@ -23,35 +23,56 @@ const CATEGORY_COLORS: Record<string, string> = {
   Privacy: "volcano",
 };
 
+let cachedServices: ServiceStartupItem[] | null = null;
+let cachedAt = 0;
+const CACHE_TTL = 30_000;
+
 export default function ServicesStartup() {
   const { t } = useTranslation();
-  const [items, setItems] = useState<ServiceStartupItem[]>([]);
+  const [items, setItems] = useState<ServiceStartupItem[]>(() => cachedServices ?? []);
   const [loading, setLoading] = useState(false);
   const [operating, setOperating] = useState<Record<string, boolean>>({});
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    loadItems();
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
-  async function loadItems() {
+  const loadItems = useCallback(async (force = false) => {
+    if (!force && cachedServices && Date.now() - cachedAt < CACHE_TTL) {
+      setItems(cachedServices);
+      return;
+    }
     setLoading(true);
     try {
       const data = await invoke<ServiceStartupItem[]>("get_service_startup_items");
+      if (!mountedRef.current) return;
+      cachedServices = data;
+      cachedAt = Date.now();
       setItems(data);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Service startup not available:", e);
-      Modal.warning({
-        title: "Dịch vụ chưa sẵn sàng",
-        content: "Backend service không khả dụng. Hãy khởi động lại ứng dụng với quyền Admin.",
-      });
+      if (mountedRef.current) {
+        Modal.warning({
+          title: "Dịch vụ chưa sẵn sàng",
+          content: "Backend service không khả dụng. Hãy khởi động lại ứng dụng với quyền Admin.",
+        });
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
     }
-    setLoading(false);
-  }
+  }, []);
 
-  function handleToggle(item: ServiceStartupItem, startType: string) {
-    const newOp = { ...operating, [item.id]: true };
-    setOperating(newOp);
+  useEffect(() => {
+    if (cachedServices && Date.now() - cachedAt < CACHE_TTL) {
+      setItems(cachedServices);
+    } else {
+      loadItems();
+    }
+  }, [loadItems]);
 
+  const handleToggle = useCallback((item: ServiceStartupItem, startType: string) => {
     const isDisable = startType === "Disabled";
     Modal.confirm({
       title: `${isDisable ? "Vô hiệu hóa" : "Bật lại"}: ${item.displayName || item.name}`,
@@ -66,26 +87,52 @@ export default function ServicesStartup() {
       okText: isDisable ? "Tắt ngay" : "Bật lại",
       okType: isDisable ? "danger" : "default",
       onOk: () => {
-        invoke("set_service_startup", { name: item.name, startType })
-          .then((_r: any) => {
-            loadItems();
-            setOperating({ ...operating });
+        setOperating(prev => ({ ...prev, [item.id]: true }));
+        invoke<[boolean, string]>("set_service_startup", { name: item.name, startType })
+          .then(() => {
+            if (!mountedRef.current) return;
+            cachedAt = 0;
+            loadItems(true);
+            setOperating(prev => {
+              const n = { ...prev };
+              delete n[item.id];
+              return n;
+            });
           })
-          .catch((e: any) => {
-            setOperating({ ...operating });
+          .catch((e: unknown) => {
+            if (!mountedRef.current) return;
+            setOperating(prev => {
+              const n = { ...prev };
+              delete n[item.id];
+              return n;
+            });
             Modal.error({ title: item.displayName, content: String(e) });
           });
       },
     });
-  }
+  }, [loadItems]);
 
-  const columns = [
+  const handleOptimize = useCallback(async () => {
+    setLoading(true);
+    try {
+      await invoke<[boolean, string]>("optimize_recommended_services");
+      cachedAt = 0;
+      await loadItems(true);
+      Modal.success({ title: "Đã tối ưu", content: "Đã tối ưu các dịch vụ đề xuất cho hiệu năng." });
+    } catch (e: unknown) {
+      Modal.error({ title: "Lỗi tối ưu", content: String(e) });
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, [loadItems]);
+
+  const columns = useMemo(() => [
     {
       title: "Tên dịch vụ",
       dataIndex: "name",
       key: "name",
       render: (name: string, rec: ServiceStartupItem) => (
-        <Space direction="vertical" size="small">
+        <Space direction="vertical" size={2}>
           <Typography.Text strong style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <ThunderboltOutlined style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }} />
             {rec.displayName || name}
@@ -121,21 +168,21 @@ export default function ServicesStartup() {
         if (st === "Auto") color = "green";
         else if (st === "Manual") color = "orange";
         else if (st === "Disabled") color = "red";
-
+        const isOp = !!operating[rec.id];
         return (
           <Space>
             <Tag color={color} style={{ margin: 0, fontSize: 11, padding: "2px 8px" }}>{st || "N/A"}</Tag>
-            {!operating[rec.id] && st !== "Disabled" && (
+            {!isOp && st !== "Disabled" && (
               <Switch
                 size="small"
-                loading={operating[rec.id]}
+                loading={isOp}
                 checkedChildren="Auto"
                 unCheckedChildren="Off"
                 checked={st === "Auto"}
                 onChange={(checked) => handleToggle(rec, checked ? "Auto" : "Disabled")}
               />
             )}
-            {!operating[rec.id] && st === "Disabled" && (
+            {!isOp && st === "Disabled" && (
               <Button
                 size="small"
                 type="primary"
@@ -144,6 +191,7 @@ export default function ServicesStartup() {
                 Bật
               </Button>
             )}
+            {isOp && <Tag color="processing">...</Tag>}
           </Space>
         );
       },
@@ -171,9 +219,7 @@ export default function ServicesStartup() {
       key: "description",
       ellipsis: true,
     },
-  ];
-
-  
+  ], [operating, handleToggle]);
 
   return (
     <Card
@@ -183,7 +229,7 @@ export default function ServicesStartup() {
           <Button
             type="primary"
             icon={<ReloadOutlined />}
-            onClick={() => loadItems()}
+            onClick={() => loadItems(true)}
             loading={loading}
           >
             Làm mới
@@ -192,10 +238,8 @@ export default function ServicesStartup() {
             type="primary"
             danger
             icon={<ExclamationCircleOutlined />}
-            onClick={async () => {
-              await invoke("optimize_recommended_services");
-              await loadItems();
-            }}
+            onClick={handleOptimize}
+            loading={loading}
           >
             Tối ưu đề xuất
           </Button>
@@ -206,7 +250,7 @@ export default function ServicesStartup() {
         <Empty description="Chạy ứng dụng với quyền Admin để xem danh sách dịch vụ." />
       ) : (
         <Table
-          columns={columns}
+          columns={columns as never}
           dataSource={items}
           loading={loading}
           rowKey="id"

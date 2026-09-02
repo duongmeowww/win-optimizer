@@ -271,8 +271,7 @@ pub struct DiskCleanScan {
     pub completed: bool,
 }
 
-#[tauri::command]
-pub fn get_disk_clean_candidates() -> DiskCleanScan {
+fn scan_sync() -> DiskCleanScan {
     let ps = r#"
 $ErrorActionPreference = 'SilentlyContinue'
 $cats = @()
@@ -352,8 +351,14 @@ $cats
 }
 
 #[tauri::command]
-pub fn run_disk_clean(ids: Vec<String>) -> u64 {
-    let scan = get_disk_clean_candidates();
+pub async fn get_disk_clean_candidates() -> DiskCleanScan {
+    tauri::async_runtime::spawn_blocking(scan_sync).await.unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn run_disk_clean(ids: Vec<String>) -> u64 {
+    tauri::async_runtime::spawn_blocking(move || {
+    let scan = scan_sync();
     let mut freed: u64 = 0;
     for cat in &scan.categories {
         if !ids.contains(&cat.id) { continue; }
@@ -375,6 +380,7 @@ pub fn run_disk_clean(ids: Vec<String>) -> u64 {
         if let Ok(v) = out.trim().parse::<u64>() { freed += v; }
     }
     freed
+    }).await.unwrap_or_default()
 }
 
 #[derive(serde::Serialize, Default)]

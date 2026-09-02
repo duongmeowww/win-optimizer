@@ -1,15 +1,16 @@
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import { ConfigProvider, theme, Spin } from "antd";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard/Dashboard";
-import DiskCleaner from "./components/DiskCleaner/DiskCleaner";
-import Debloat from "./components/Debloat/Debloat";
-import MemoryCleaner from "./components/MemoryCleaner/MemoryCleaner";
-import ServicesStartup from "./components/ServicesStartup/ServicesStartup";
-import Gaming from "./components/Gaming/Gaming";
-import Diagnostics from "./components/Diagnostics/Diagnostics";
-import AdvancedTools from "./components/Settings/AdvancedTools";
+
+const Dashboard = lazy(() => import("./components/Dashboard/Dashboard"));
+const DiskCleaner = lazy(() => import("./components/DiskCleaner/DiskCleaner"));
+const Debloat = lazy(() => import("./components/Debloat/Debloat"));
+const MemoryCleaner = lazy(() => import("./components/MemoryCleaner/MemoryCleaner"));
+const ServicesStartup = lazy(() => import("./components/ServicesStartup/ServicesStartup"));
+const Gaming = lazy(() => import("./components/Gaming/Gaming"));
+const Diagnostics = lazy(() => import("./components/Diagnostics/Diagnostics"));
+const AdvancedTools = lazy(() => import("./components/Settings/AdvancedTools"));
 
 function Loading() {
   return (

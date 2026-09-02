@@ -98,26 +98,65 @@ if ($svc) {{ $svc.DisplayName }} else {{ '{0}' }}
 }
 
 /// Trả về danh sách dịch vụ được monitor + trạng thái startup hiện tại.
+/// Tối ưu: gộp 75 lần gọi PowerShell thành 1 lần duy nhất (~0.8s thay vì 30-40s)
 #[tauri::command]
 pub async fn get_service_startup_items() -> Vec<ServiceStartupItem> {
     spawn_blocking(|| {
-        let mut result = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        for (name, category, desc) in SERVICE_CATEGORIES.iter() {
-            if seen.contains(name) { continue; }
-            seen.insert(name);
-            let display_name = service_display_name(name);
-            let status = service_status(name);
-            let start_type = service_start_type(name);
-            let id = format!("svc_{}", name.to_lowercase());
+        use std::collections::{HashMap, HashSet};
+        // Dedupe + giữ category/desc đầu tiên cho mỗi service
+        let mut meta: HashMap<&str, (&str, &str)> = HashMap::new();
+        let mut order: Vec<&str> = Vec::new();
+        for (name, cat, desc) in SERVICE_CATEGORIES.iter() {
+            if !meta.contains_key(name) {
+                meta.insert(name, (cat, desc));
+                order.push(name);
+            }
+        }
+        if order.is_empty() { return Vec::new(); }
 
+        // Build 1 Powershell script duy nhất
+        let names_ps = order.iter().map(|n| format!("'{}'", n)).collect::<Vec<_>>().join(",");
+        let ps = format!(
+            r#"
+$ErrorActionPreference='SilentlyContinue'
+$names=@({})
+foreach ($n in $names) {{
+  $svc=Get-Service -Name $n -ErrorAction SilentlyContinue
+  $cim=Get-CimInstance Win32_Service -Filter "Name='$n'" -ErrorAction SilentlyContinue
+  $status=if ($svc) {{ $svc.Status }} else {{ 'Unknown' }}
+  $start=if ($cim) {{ $cim.StartMode }} else {{ 'Unknown' }}
+  $disp=if ($cim -and $cim.DisplayName) {{ $cim.DisplayName }} else {{ $n }}
+  # Escape | trong tên
+  $disp=$disp -replace '\|','/'
+  Write-Output "$n|$status|$start|$disp"
+}}
+"#,
+            names_ps
+        );
+        let out = ps_quiet(&ps, 15);
+        let mut lookup: HashMap<String, (String, String, String)> = HashMap::new();
+        for line in out.lines() {
+            let line = line.trim();
+            if line.is_empty() { continue; }
+            let parts: Vec<&str> = line.splitn(4, '|').collect();
+            if parts.len() < 4 { continue; }
+            lookup.insert(parts[0].to_string(), (parts[1].to_string(), parts[2].to_string(), parts[3].to_string()));
+        }
+
+        let mut result = Vec::new();
+        for name in order {
+            let (cat, desc) = meta[name];
+            let (status, start_type, display_name) = lookup.get(name)
+                .map(|(s, st, d)| (s.clone(), st.clone(), d.clone()))
+                .unwrap_or(("Unknown".into(), "Unknown".into(), name.to_string()));
+            let id = format!("svc_{}", name.to_lowercase());
             result.push(ServiceStartupItem {
                 id,
                 name: name.to_string(),
                 display_name,
                 status,
                 start_type,
-                category: category.to_string(),
+                category: cat.to_string(),
                 description: desc.to_string(),
             });
         }

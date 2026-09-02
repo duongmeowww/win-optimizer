@@ -21,6 +21,16 @@ export default defineConfig({
     // (without this, /assets/... 404s or hits http://localhost refused)
     assetsDir: "assets",
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: (id: string) => {
+          if (id.includes("node_modules/antd") || id.includes("node_modules/@ant-design")) return "antd";
+          if (id.includes("node_modules/react")) return "react";
+          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) return "i18n";
+        },
+      },
+    },
   },
   // base: "" => Vite emits ./assets/... instead of /assets/...
   base: "",
