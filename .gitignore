@@ -23,3 +23,6 @@ fix_*.py
 
 # Tauri generated
 src-tauri/gen/
+dev_log*.txt
+build_log*.txt
+src-tauri/build_log*.txt

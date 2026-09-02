@@ -1,8 +1,0 @@
-﻿cargo :    Compiling win-optimizer v0.1.0 (C:\Users\PC\.openclaw\workspace\win-optimizer\src-tauri)
-At line:1 char:1
-+ cargo build 2>&1 | Out-File -FilePath build_log3.txt -Encoding utf8
-+ ~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (   Compiling wi...izer\src-tauri):String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.85s
