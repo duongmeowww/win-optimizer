@@ -1,5 +1,6 @@
 use super::*;
 use super::gaming::{ps_quiet, reg_val};
+use tauri::{AppHandle, Emitter};
 
 // ============ Gaming Profile Presets ============
 
@@ -11,20 +12,8 @@ pub struct GamingPreset {
     pub aggressive: bool, // cần confirm
     pub tweaks: Vec<String>, // id tweak áp dụng
     pub active: bool,
-}
-
-/// Áp dụng một batch tweak = đổi từng cái qua apply_gaming_tweak (rồi trace riêng).
-fn apply_ids(ids: &[String]) -> (usize, Vec<String>) {
-    let mut ok = 0;
-    let mut fails = Vec::new();
-    for id in ids {
-        if let Ok((true, _)) = super::gaming::apply_gaming_tweak(id.clone(), "apply".into()) {
-            ok += 1;
-        } else {
-            fails.push(id.clone());
-        }
-    }
-    (ok, fails)
+    pub active_count: usize,
+    pub total: usize,
 }
 
 #[tauri::command]
@@ -35,6 +24,8 @@ pub fn get_gaming_presets() -> Vec<GamingPreset> {
         .map(|t| t.id)
         .collect();
 
+    let count = |ids: &[&str]| ids.iter().filter(|i| active.contains(&i.to_string())).count();
+
     vec![
         GamingPreset {
             id: "performance".into(),
@@ -43,6 +34,8 @@ pub fn get_gaming_presets() -> Vec<GamingPreset> {
             aggressive: false,
             tweaks: vec!["hags".into(), "game_mode".into(), "game_dvr".into(), "nagle".into(), "net_throttle".into(), "sys_resp".into(), "win32prio".into(), "mmcss".into(), "mouse".into()],
             active: active.iter().all(|a| ["hags".to_string(), "game_mode".to_string(), "game_dvr".to_string(), "nagle".to_string(), "net_throttle".to_string(), "sys_resp".to_string(), "win32prio".to_string(), "mmcss".to_string(), "mouse".to_string()].contains(a)),
+            active_count: count(&["hags", "game_mode", "game_dvr", "nagle", "net_throttle", "sys_resp", "win32prio", "mmcss", "mouse"]),
+            total: 9,
         },
         GamingPreset {
             id: "ultra".into(),
@@ -51,32 +44,47 @@ pub fn get_gaming_presets() -> Vec<GamingPreset> {
             aggressive: false,
             tweaks: vec!["hags".into(), "game_mode".into(), "game_dvr".into(), "nagle".into(), "net_throttle".into(), "sys_resp".into(), "win32prio".into(), "mmcss".into(), "mouse".into(), "ult_power".into(), "core_park".into(), "tdr".into()],
             active: active.iter().all(|a| ["hags".to_string(), "game_mode".to_string(), "game_dvr".to_string(), "nagle".to_string(), "net_throttle".to_string(), "sys_resp".to_string(), "win32prio".to_string(), "mmcss".to_string(), "mouse".to_string(), "ult_power".to_string(), "core_park".to_string(), "tdr".to_string()].contains(a)),
+            active_count: count(&["hags", "game_mode", "game_dvr", "nagle", "net_throttle", "sys_resp", "win32prio", "mmcss", "mouse", "ult_power", "core_park", "tdr"]),
+            total: 12,
         },
     ]
 }
 
 #[tauri::command]
-pub fn apply_gaming_preset(id: String, action: String) -> Result<(bool, String), String> {
+pub async fn apply_gaming_preset(app: AppHandle, id: String, action: String) -> Result<(bool, String), String> {
     let presets = get_gaming_presets();
     let p = presets.into_iter().find(|x| x.id == id).ok_or("Preset không tồn tại")?;
-    let (ok, fails) = match action.as_str() {
-        "apply" => apply_ids(&p.tweaks),
-        "revert" => {
-            let mut n = 0;
-            let mut f = Vec::new();
-            for tid in &p.tweaks {
-                if let Ok((true, _)) = super::gaming::apply_gaming_tweak(tid.clone(), "revert".into()) {
-                    n += 1;
-                } else { f.push(tid.clone()); }
-            }
-            (n, f)
+    let tweaks = p.tweaks.clone();
+    let label = p.label.clone();
+    let action_inner = action.clone();
+
+    // Chạy nền — không block UI thread. Emit tiến trình từng tweak.
+    let (ok, fails) = tauri::async_runtime::spawn_blocking(move || {
+        let mut ok = 0;
+        let mut fails: Vec<String> = Vec::new();
+        let total = tweaks.len();
+        for (i, tid) in tweaks.iter().enumerate() {
+            let r = super::gaming::apply_gaming_tweak(tid.clone(), action_inner.clone());
+            let success = r.is_ok();
+            let _ = app.emit("preset-progress", serde_json::json!({
+                "index": i + 1,
+                "total": total,
+                "id": tid,
+                "ok": success,
+                "label": super::gaming::get_gaming_tweaks().into_iter().find(|t| t.id == *tid).map(|t| t.label).unwrap_or_else(|| tid.clone()),
+                "msg": r.map(|(_, m)| m).unwrap_or_else(|e| e),
+            }));
+            if success { ok += 1; } else { fails.push(tid.clone()); }
         }
-        _ => return Err("action phải là apply/revert".into()),
-    };
+        (ok, fails)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
     let msg = if fails.is_empty() {
-        format!("{} preset '{}': {} tweak xong.", if action == "apply" { "Áp" } else { "Hoàn tác" }, p.label, ok)
+        format!("{} preset '{}': {} tweak xong.", if action == "apply" { "Áp" } else { "Hoàn tác" }, label, ok)
     } else {
-        format!("{} preset '{}': {} xong, {} lỗi: {:?}", if action == "apply" { "Áp" } else { "Hoàn tác" }, p.label, ok, fails.len(), fails)
+        format!("{} preset '{}': {} xong, {} lỗi: {:?}", if action == "apply" { "Áp" } else { "Hoàn tác" }, label, ok, fails.len(), fails)
     };
     Ok((fails.is_empty(), msg))
 }

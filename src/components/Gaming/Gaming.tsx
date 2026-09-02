@@ -17,6 +17,7 @@ import {
   Select,
   Statistic,
   Empty,
+  Progress,
 } from "antd";
 import {
   ThunderboltOutlined,
@@ -26,14 +27,17 @@ import {
   WarningOutlined,
   PlayCircleOutlined,
   StopOutlined,
+  CloseOutlined,
   SafetyCertificateOutlined,
   RocketOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface GamingTweak { id: string; label: string; desc: string; category: string; active: boolean; tradeoff: boolean; }
-interface GamingPreset { id: string; label: string; desc: string; aggressive: boolean; tweaks: string[]; active: boolean; }
+interface GamingPreset { id: string; label: string; desc: string; aggressive: boolean; tweaks: string[]; active: boolean; active_count: number; total: number; }
+interface PresetStep { index: number; total: number; id: string; ok: boolean; label: string; msg: string; }
 interface SessionState { active: boolean; saved_power_guid: string; suspended: string[]; power_plan_switched: boolean; }
 interface GameProfile { path: string; name: string; gpu_pref: number; fso_off: boolean; run_as_admin: boolean; exists: boolean; }
 interface VerifyItem { id: string; label: string; ok: boolean; expected: string; }
@@ -163,23 +167,34 @@ function PresetsTab() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, msgCtx] = message.useMessage();
+  const [steps, setSteps] = useState<PresetStep[]>([]);
+  const [running, setRunning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setPresets(await invoke<GamingPreset[]>("get_gaming_presets")); }
+    try { setPresets(await invoke<GamingPreset[]>(`get_gaming_presets`)); }
     catch (e) { msg.error("Lỗi: " + e); }
     finally { setLoading(false); }
   }, [msg]);
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const un = listen<PresetStep>("preset-progress", (ev) => {
+      setSteps((prev) => [...prev, ev.payload]);
+    });
+    return () => { un.then((f) => f()); };
+  }, []);
+
   const run = useCallback(async (id: string, action: "apply" | "revert") => {
     setBusy(id);
+    setRunning(true);
+    setSteps([]);
     try {
       const [ok, out] = await invoke<[boolean, string]>("apply_gaming_preset", { id, action });
       if (ok) msg.success(out); else msg.warning(out);
       await load();
     } catch (e) { msg.error("Lỗi: " + e); }
-    finally { setBusy(null); }
+    finally { setBusy(null); setRunning(false); }
   }, [msg, load]);
 
   return (
@@ -201,12 +216,50 @@ function PresetsTab() {
             ]}
           >
             <List.Item.Meta
-              title={<Space>{p.label} <Tag color={p.active ? "success" : "default"}>{p.active ? "Đang bật" : "Tắt"}</Tag></Space>}
-              description={p.desc}
+              title={
+                <Space>
+                  {p.label}
+                  {p.active ? (
+                    <Tag color="success">Đang bật ({p.active_count}/{p.total})</Tag>
+                  ) : p.active_count > 0 ? (
+                    <Tag color="processing">Đang bật {p.active_count}/{p.total}</Tag>
+                  ) : (
+                    <Tag color="default">Đang tắt</Tag>
+                  )}
+                </Space>
+              }
+              description={
+                <Space direction="vertical" size={0}>
+                  <span>{p.desc}</span>
+                  <Progress percent={Math.round((p.active_count / p.total) * 100)} size="small" format={() => `${p.active_count}/${p.total} tweak hoạt động`} />
+                </Space>
+              }
             />
           </List.Item>
         )}
       />
+      {(running || steps.length > 0) && (
+        <Card size="small" style={{ marginTop: 16 }} title={
+          <Space>Quá trình chạy <Tag color={running ? "processing" : (steps.every((s) => s.ok) ? "success" : "warning")}>{steps.filter((s) => s.ok).length}/{steps.length}</Tag>
+            {!running && <Button size="small" type="text" icon={<CloseOutlined />} onClick={() => setSteps([])} />}
+          </Space>
+        }>
+          {running && <Progress percent={Math.round((steps.filter((s) => s.ok).length / (steps[steps.length - 1]?.total || 1)) * 100)} />}
+          <List
+            size="small"
+            dataSource={steps}
+            renderItem={(s) => (
+              <List.Item style={{ padding: "4px 0" }}>
+                <Space>
+                  {s.ok ? <CheckCircleOutlined style={{ color: "#52c41a" }} /> : <WarningOutlined style={{ color: "#faad14" }} />}
+                  <span>{s.label}</span>
+                  <span style={{ color: s.ok ? "#52c41a" : "#faad14" }}>{s.ok ? "Đang bật" : "Lỗi"}</span>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </Card>
+      )}
     </Card>
   );
 }
