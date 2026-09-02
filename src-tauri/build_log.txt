@@ -1,0 +1,266 @@
+﻿cargo :    Compiling win-optimizer v0.1.0 (C:\Users\PC\.openclaw\workspace\win-optimizer\src-tauri)
+At line:1 char:1
++ cargo build 2>&1 | Out-File -FilePath build_log.txt -Encoding utf8
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling wi...izer\src-tauri):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error[E0432]: unresolved imports `windows::Win32::System::Memory::GlobalMemoryStatusEx`, 
+`windows::Win32::System::Memory::MEMORYSTATUSEX`
+   --> src\commands\mod.rs:273:38
+    |
+273 | use windows::Win32::System::Memory::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+    |                                      ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^ no `MEMORYSTATUSEX` in 
+`Win32::System::Memory`
+    |                                      |
+    |                                      no `GlobalMemoryStatusEx` in `Win32::System::Memory`
+
+warning: unused imports: `HANDLE` and `TRUE`
+   --> src\commands\mod.rs:272:34
+    |
+272 | use windows::Win32::Foundation::{HANDLE, FALSE, TRUE, CloseHandle};
+    |                                  ^^^^^^         ^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0609]: no field `0` on type `Result<HANDLE, windows_result::error::Error>`
+   --> src\commands\mod.rs:313:14
+    |
+313 |         if h.0 != 0 {
+    |              ^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+313 |         if h.unwrap().0 != 0 {
+    |              +++++++++
+
+error[E0271]: type mismatch resolving `<Result<HANDLE, Error> as TypeKind>::TypeKind == CopyType`
+   --> src\commands\mod.rs:314:46
+    |
+314 |             let _ = unsafe { EmptyWorkingSet(h) };
+    |                              --------------- ^ expected `CopyType`, found `InterfaceType`
+    |                              |
+    |                              required by a bound introduced by this call
+    |
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `EmptyWorkingSet`
+   --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\System\Process
+Status\mod.rs:4:9
+    |
+  2 | pub unsafe fn EmptyWorkingSet<P0>(hprocess: P0) -> windows_core::Result<()>
+    |               --------------- required by a bound in this function
+  3 | where
+  4 |     P0: windows_core::Param<super::super::Foundation::HANDLE>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `EmptyWorkingSet`
+
+error[E0277]: the trait bound `Result<HANDLE, windows_result::error::Error>: Param<HANDLE, core::r#type::CopyType>` is 
+not satisfied
+     --> src\commands\mod.rs:314:46
+      |
+  314 |             let _ = unsafe { EmptyWorkingSet(h) };
+      |                              --------------- ^ the trait `core::imp::can_into::CanInto<HANDLE>` is not 
+implemented for `Result<HANDLE, windows_result::error::Error>`
+      |                              |
+      |                              required by a bound introduced by this call
+      |
+note: there are multiple different versions of crate `windows_core` in the dependency graph
+     --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.58.0\src\imp\can_into.rs:1:1
+      |
+    1 | pub trait CanInto<T>: Sized {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ this is the expected trait
+      |
+     ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.61.2\src\imp\can_into.rs:1:1
+      |
+    1 | pub trait CanInto<T>: Sized {
+      | --------------------------- this is the found trait
+      |
+     ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.52.0\src\param.rs:70:1
+      |
+   70 | pub trait CanInto<T>: Sized
+      | --------------------------- this is the found trait
+      = help: you can use `cargo tree` to explore your dependency tree
+help: the trait `core::imp::can_into::CanInto<HANDLE>` is implemented for `HWND`
+     --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\Foundation\m
+od.rs:10880:1
+      |
+10880 | impl windows_core::imp::CanInto<HANDLE> for HWND {}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `EmptyWorkingSet`
+     --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\System\Proce
+ssStatus\mod.rs:4:9
+      |
+    2 | pub unsafe fn EmptyWorkingSet<P0>(hprocess: P0) -> windows_core::Result<()>
+      |               --------------- required by a bound in this function
+    3 | where
+    4 |     P0: windows_core::Param<super::super::Foundation::HANDLE>,
+      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `EmptyWorkingSet`
+
+error[E0277]: the trait bound `Result<HANDLE, windows_result::error::Error>: Param<HANDLE, core::r#type::CopyType>` is 
+not satisfied
+   --> src\commands\mod.rs:314:46
+    |
+314 |             let _ = unsafe { EmptyWorkingSet(h) };
+    |                              --------------- ^ the trait `Interface` is not implemented for `Result<HANDLE, 
+windows_result::error::Error>`
+    |                              |
+    |                              required by a bound introduced by this call
+    |
+note: there are multiple different versions of crate `windows_core` in the dependency graph
+   --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.58.0\src\interface.rs:14:1
+    |
+ 14 | pub unsafe trait Interface: Sized + Clone {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this is the expected trait
+    |
+   ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.61.2\src\interface.rs:14:1
+    |
+ 14 | pub unsafe trait Interface: Sized + Clone {
+    | ----------------------------------------- this is the trait that was imported
+    |
+   ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.52.0\src\interface.rs:7:1
+    |
+  7 | pub unsafe trait Interface: Sized {
+    | --------------------------------- this is the trait that was imported
+    = help: you can use `cargo tree` to explore your dependency tree
+    = help: the following other types implement trait `Interface`:
+              IInspectable
+              IRtwqAsyncCallback
+              IRtwqAsyncResult
+              IRtwqPlatformEvents
+              IUnknown
+              RTWQASYNCRESULT
+              core::imp::com_bindings::IAgileObject
+              core::imp::com_bindings::IAgileReference
+            and 3 others
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `core::r#type::TypeKind`
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `EmptyWorkingSet`
+   --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\System\Process
+Status\mod.rs:4:9
+    |
+  2 | pub unsafe fn EmptyWorkingSet<P0>(hprocess: P0) -> windows_core::Result<()>
+    |               --------------- required by a bound in this function
+  3 | where
+  4 |     P0: windows_core::Param<super::super::Foundation::HANDLE>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `EmptyWorkingSet`
+
+error[E0271]: type mismatch resolving `<Result<HANDLE, Error> as TypeKind>::TypeKind == CopyType`
+   --> src\commands\mod.rs:315:42
+    |
+315 |             let _ = unsafe { CloseHandle(h) };
+    |                              ----------- ^ expected `CopyType`, found `InterfaceType`
+    |                              |
+    |                              required by a bound introduced by this call
+    |
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `CloseHandle`
+   --> 
+C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\Foundation\mod.rs:4:9
+    |
+  2 | pub unsafe fn CloseHandle<P0>(hobject: P0) -> windows_core::Result<()>
+    |               ----------- required by a bound in this function
+  3 | where
+  4 |     P0: windows_core::Param<HANDLE>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CloseHandle`
+
+error[E0277]: the trait bound `Result<HANDLE, windows_result::error::Error>: Param<HANDLE, core::r#type::CopyType>` is 
+not satisfied
+     --> src\commands\mod.rs:315:42
+      |
+  315 |             let _ = unsafe { CloseHandle(h) };
+      |                              ----------- ^ the trait `core::imp::can_into::CanInto<HANDLE>` is not implemented 
+for `Result<HANDLE, windows_result::error::Error>`
+      |                              |
+      |                              required by a bound introduced by this call
+      |
+note: there are multiple different versions of crate `windows_core` in the dependency graph
+     --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.58.0\src\imp\can_into.rs:1:1
+      |
+    1 | pub trait CanInto<T>: Sized {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ this is the expected trait
+      |
+     ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.61.2\src\imp\can_into.rs:1:1
+      |
+    1 | pub trait CanInto<T>: Sized {
+      | --------------------------- this is the found trait
+      |
+     ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.52.0\src\param.rs:70:1
+      |
+   70 | pub trait CanInto<T>: Sized
+      | --------------------------- this is the found trait
+      = help: you can use `cargo tree` to explore your dependency tree
+help: the trait `core::imp::can_into::CanInto<HANDLE>` is implemented for `HWND`
+     --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\Foundation\m
+od.rs:10880:1
+      |
+10880 | impl windows_core::imp::CanInto<HANDLE> for HWND {}
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `CloseHandle`
+     --> 
+C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\Foundation\mod.rs:4:9
+      |
+    2 | pub unsafe fn CloseHandle<P0>(hobject: P0) -> windows_core::Result<()>
+      |               ----------- required by a bound in this function
+    3 | where
+    4 |     P0: windows_core::Param<HANDLE>,
+      |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CloseHandle`
+
+error[E0277]: the trait bound `Result<HANDLE, windows_result::error::Error>: Param<HANDLE, core::r#type::CopyType>` is 
+not satisfied
+   --> src\commands\mod.rs:315:42
+    |
+315 |             let _ = unsafe { CloseHandle(h) };
+    |                              ----------- ^ the trait `Interface` is not implemented for `Result<HANDLE, 
+windows_result::error::Error>`
+    |                              |
+    |                              required by a bound introduced by this call
+    |
+note: there are multiple different versions of crate `windows_core` in the dependency graph
+   --> C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.58.0\src\interface.rs:14:1
+    |
+ 14 | pub unsafe trait Interface: Sized + Clone {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this is the expected trait
+    |
+   ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.61.2\src\interface.rs:14:1
+    |
+ 14 | pub unsafe trait Interface: Sized + Clone {
+    | ----------------------------------------- this is the trait that was imported
+    |
+   ::: C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-core-0.52.0\src\interface.rs:7:1
+    |
+  7 | pub unsafe trait Interface: Sized {
+    | --------------------------------- this is the trait that was imported
+    = help: you can use `cargo tree` to explore your dependency tree
+    = help: the following other types implement trait `Interface`:
+              IInspectable
+              IRtwqAsyncCallback
+              IRtwqAsyncResult
+              IRtwqPlatformEvents
+              IUnknown
+              RTWQASYNCRESULT
+              core::imp::com_bindings::IAgileObject
+              core::imp::com_bindings::IAgileReference
+            and 3 others
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `core::r#type::TypeKind`
+    = note: required for `Result<HANDLE, windows_result::error::Error>` to implement `Param<HANDLE, 
+core::r#type::CopyType>`
+note: required by a bound in `CloseHandle`
+   --> 
+C:\Users\PC\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.58.0\src\Windows\Win32\Foundation\mod.rs:4:9
+    |
+  2 | pub unsafe fn CloseHandle<P0>(hobject: P0) -> windows_core::Result<()>
+    |               ----------- required by a bound in this function
+  3 | where
+  4 |     P0: windows_core::Param<HANDLE>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `CloseHandle`
+
+Some errors have detailed explanations: E0271, E0277, E0432, E0609.
+For more information about an error, try `rustc --explain E0271`.
+warning: `win-optimizer` (lib) generated 1 warning
+error: could not compile `win-optimizer` (lib) due to 8 previous errors; 1 warning emitted

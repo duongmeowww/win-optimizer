@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "react-router-dom";
-import { Row, Col, Card, Spin, Alert } from "antd";
-import {
-  DesktopOutlined,
-  HddOutlined,
-  ThunderboltOutlined,
-  ApiOutlined,
-  RiseOutlined,
-  ClockCircleOutlined,
-  WindowsOutlined,
-} from "@ant-design/icons";
-import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  InfoCircleOutlined,
+  ClockCircleOutlined,
+  ControlOutlined,
+  DeploymentUnitOutlined,
+  HddOutlined,
+  ExpandOutlined,
+  HeartOutlined,
+  BarChartOutlined,
+  BulbOutlined,
+  ClearOutlined,
+  ExperimentOutlined,
+  SafetyOutlined,
+} from "@ant-design/icons";
 
 interface DiskInfo {
   name: string;
@@ -32,8 +35,15 @@ interface SystemInfo {
   gpu_name: string;
   gpu_clock_mhz: number;
   gpu_temp_c: number;
+  gpu_usage: number;
   os_version: string;
   uptime_seconds: number;
+}
+
+function fmtBytes(b: number): string {
+  const gb = b / 1073741824;
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  return `${(b / 1048576).toFixed(0)} MB`;
 }
 
 function fmtGHz(mhz: number): string {
@@ -41,74 +51,92 @@ function fmtGHz(mhz: number): string {
   return `${(mhz / 1000).toFixed(2)} GHz`;
 }
 
-const MAX_POINTS = 30;
+const MAX_POINTS = 24;
 
-/* Mini sparkline — pure SVG, dark friendly */
+/* Smooth SVG sparkline */
 function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const w = 120;
-  const h = 32;
+  const w = 150;
+  const h = 46;
   if (data.length < 2) return <div style={{ height: h }} />;
   const max = Math.max(100, ...data);
   const step = w / (data.length - 1);
-  const points = data.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 4) - 2).toFixed(1)}`).join(" ");
-  const area = `0,${h} ${points} ${w},${h}`;
+  const pts = data
+    .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 8) - 4).toFixed(1)}`)
+    .join(" ");
+  const area = `0,${h} ${pts} ${w},${h}`;
+  const gid = `sg-${color.replace("#", "")}`;
   return (
-    <svg width={w} height={h} style={{ display: "block", marginTop: 8 }}>
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gid})`} />
       <polyline
-        points={points}
+        points={pts}
         fill="none"
         stroke={color}
-        strokeWidth={1.5}
+        strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
-        opacity={0.9}
       />
-      <polygon points={area} fill={color} opacity={0.08} />
     </svg>
   );
 }
 
-/* Semi-circle gauge */
-function SemiGauge({ value, color }: { value: number; color: string }) {
-  const pct = Math.max(0, Math.min(100, value)) / 100;
-  const r = 40;
-  const c = Math.PI * r; // half circumference
-  const offset = c * (1 - pct);
+/* Circular progress ring */
+function Ring({ value, size = 128, stroke = 10, color, children }: any) {
+  const pct = Math.max(0, Math.min(100, value));
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - pct / 100);
   return (
-    <svg width={100} height={56} viewBox="0 0 100 56" style={{ display: "block", margin: "0 auto" }}>
-      <path
-        d="M 10 50 A 40 40 0 0 1 90 50"
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <defs>
+        <linearGradient id={`ring-${color.replace("#", "")}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={color} />
+          <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+        </linearGradient>
+      </defs>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
         fill="none"
-        stroke="rgba(148,163,184,0.2)"
-        strokeWidth={7}
-        strokeLinecap="round"
+        stroke="rgba(148,163,184,0.18)"
+        strokeWidth={stroke}
       />
-      <path
-        d="M 10 50 A 40 40 0 0 1 90 50"
+      <circle
+        className="ring-arc"
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
         fill="none"
-        stroke={color}
-        strokeWidth={7}
+        stroke={`url(#ring-${color.replace("#", "")})`}
+        strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={c}
         strokeDashoffset={offset}
-        style={{ transition: "stroke-dashoffset 0.6s ease" }}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
-      <text x={50} y={46} textAnchor="middle" fill="#f1f5f9" fontSize={16} fontWeight={700}>
-        {Math.round(value)}
-      </text>
+      <foreignObject x={0} y={0} width={size} height={size}>
+        <div className="ring-label">{children}</div>
+      </foreignObject>
     </svg>
   );
 }
 
 export default function Dashboard() {
-  const { t } = useTranslation();
   const location = useLocation();
   const isActive = location.pathname === "/" || location.pathname === "/dashboard";
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ cpu: number[]; ram: number[]; gpu: number[] }>({
+  const [history, setHistory] = useState<{ cpu: number[]; ram: number[]; disk: number[]; gpu: number[] }>({
     cpu: [],
     ram: [],
+    disk: [],
     gpu: [],
   });
   const busyRef = useRef(false);
@@ -116,172 +144,246 @@ export default function Dashboard() {
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const load = useCallback(async (showSpinner: boolean) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    if (showSpinner) setInfo(null);
+    try {
+      if (!("__TAURI_INTERNALS__" in window)) {
+        setError("Chạy `npm run tauri dev` để khởi động backend.");
+        return;
+      }
+      const data = await invoke<SystemInfo>("get_sys_info");
+      if (mountedRef.current) {
+        setInfo(data);
+        const diskPct = data.disk_total
+          ? Math.round(((data.disk_total - data.disk_free) / data.disk_total) * 100)
+          : 0;
+        setHistory((h) => ({
+          cpu: [...h.cpu, data.cpu_usage].slice(-MAX_POINTS),
+          ram: [
+            ...h.ram,
+            data.ram_total ? Math.round((data.ram_used / data.ram_total) * 100) : 0,
+          ].slice(-MAX_POINTS),
+          disk: [...h.disk, diskPct].slice(-MAX_POINTS),
+          gpu: [...h.gpu, Math.min(100, Math.round(data.gpu_usage || 0))].slice(-MAX_POINTS),
+        }));
+      }
+    } catch (e) {
+      if (mountedRef.current) setError(String(e));
+    } finally {
+      busyRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
     if (!isActive) return;
-    async function load(showSpinner: boolean) {
-      if (busyRef.current) return;
-      busyRef.current = true;
-      if (showSpinner) setInfo(null);
-      try {
-        const isTauri = "__TAURI_INTERNALS__" in window;
-        if (!isTauri) {
-          setError("Tauri backend not running — run `npm run tauri dev`");
-          return;
-        }
-        const data = await invoke<SystemInfo>("get_sys_info");
-        if (mountedRef.current) {
-          setInfo(data);
-          setHistory((h) => ({
-            cpu: [...h.cpu, data.cpu_usage].slice(-MAX_POINTS),
-            ram: [...h.ram, Math.round((data.ram_used / data.ram_total) * 100)].slice(-MAX_POINTS),
-            gpu: [...h.gpu, data.gpu_clock_mhz ? Math.min(100, 60) : 0].slice(-MAX_POINTS),
-          }));
-        }
-      } catch (e) {
-        if (mountedRef.current) setError(String(e));
-      } finally {
-        busyRef.current = false;
-      }
-    }
     load(true);
     const id = setInterval(() => load(false), 5000);
     return () => clearInterval(id);
-  }, [isActive]);
+  }, [isActive, load]);
 
-  if (error) return <Alert type="info" showIcon message={error} />;
-  if (!info) return <Spin size="large" style={{ display: "block", margin: "40px auto" }} />;
+  if (error) {
+    return (
+      <div className="dash-error">
+        <InfoCircleOutlined style={{ fontSize: 34, color: "#22d3ee" }} />
+        <p style={{ color: "#94a3b8" }}>{error}</p>
+      </div>
+    );
+  }
+  if (!info) {
+    return (
+      <div className="dash-loading"><div className="dash-spinner" /></div>
+    );
+  }
 
-  const ramPct = Math.round((info.ram_used / info.ram_total) * 100);
-  const diskPct = Math.round(((info.disk_total - info.disk_free) / info.disk_total) * 100);
-  const health = Math.max(0, 100 - Math.min(80, ramPct) - Math.max(0, diskPct - 70));
-  const cpuTempText = info.cpu_temp_c > 0 ? `${info.cpu_temp_c.toFixed(0)}°C` : "N/A";
-  const gpuTempText = info.gpu_temp_c > 0 ? `${info.gpu_temp_c.toFixed(0)}°C` : "N/A";
-  const cpuColor = info.cpu_usage > 85 ? "#f87171" : "#60a5fa";
-  const ramColor = ramPct > 85 ? "#f87171" : "#34d399";
-  const diskColor = diskPct > 85 ? "#f87171" : "#fbbf24";
+  // Derived metrics
+  const ramPct = info.ram_total ? Math.round((info.ram_used / info.ram_total) * 100) : 0;
+  const diskUsed = info.disk_total - info.disk_free;
+  const diskPct = info.disk_total ? Math.round((diskUsed / info.disk_total) * 100) : 0;
+  const gpuPct = Math.min(100, Math.round(info.gpu_usage || 0));
+  const health = Math.max(
+    0,
+    Math.min(100, 100 - Math.min(60, ramPct) - Math.max(0, diskPct - 70))
+  );
+  const uptimeH = Math.floor(info.uptime_seconds / 3600);
+  const uptimeM = Math.floor((info.uptime_seconds % 3600) / 60);
+
+  const cpuColor = "#38bdf8";
+  const ramColor = "#a78bfa";
+  const diskColor = "#fbbf24";
+  const gpuColor = "#34d399";
   const healthColor = health > 70 ? "#34d399" : health > 40 ? "#fbbf24" : "#f87171";
 
-  const cardStyle = { height: "100%" };
+  // Recommendations (based on finished data)
+  const recommendations: { icon: React.ReactNode; title: string; desc: string; tag: string; tagStyle: any }[] = [];
+  if (diskPct >= 80) {
+    recommendations.push({
+      icon: <ClearOutlined />,
+      title: "Dọn dẹp file rác",
+      desc: `Ổ đĩa đang đầy (${diskPct}%). Xóa file tạm & rác hệ thống.`,
+      tag: "Khuyến nghị",
+      tagStyle: { background: "rgba(34,211,238,0.12)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.3)" },
+    });
+  }
+  if (ramPct >= 80) {
+    recommendations.push({
+      icon: <ExperimentOutlined />,
+      title: "Giải phóng RAM",
+      desc: `RAM đang sử dụng ${ramPct}%. Giải phóng bộ nhớ hoạt động.`,
+      tag: "Khuyến nghị",
+      tagStyle: { background: "rgba(167,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" },
+    });
+  }
+  if (recommendations.length === 0) {
+    recommendations.push({
+      icon: <SafetyOutlined />,
+      title: "Hệ thống khỏe mạnh",
+      desc: "Chạy quét nhanh để kiểm tra toàn diện phần mềm không cần thiết.",
+      tag: "Ổn định",
+      tagStyle: { background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)" },
+    });
+  }
 
   return (
-    <div>
-      <Row gutter={[14, 14]}>
+    <div className="dash-root">
+      {/* Header */}
+      <div className="dash-header">
+        <div>
+          <h1 className="dash-title">Bảng điều khiển</h1>
+          <p className="dash-subtitle">{info.os_version}</p>
+        </div>
+        <div className="dash-uptime-badge">
+        <ClockCircleOutlined />
+          Hoạt động: {uptimeH}h {uptimeM}m
+        </div>
+      </div>
+
+      {/* Stats cards grid */}
+      <div className="stats-grid">
         {/* CPU */}
-        <Col span={5}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <DesktopOutlined style={{ color: cpuColor }} />
-              {t("dashboard.cpu")}
-            </div>
-            <div className="dash-card-value" style={{ color: cpuColor }}>
-              {info.cpu_usage.toFixed(1)}%
-            </div>
-            <div className="dash-card-sub">{info.cpu_name || "N/A"}</div>
-            <div className="dash-card-sub">
-              ⚡ {fmtGHz(info.cpu_clock_mhz)} · 🌡 {cpuTempText}
-            </div>
-            <Sparkline data={history.cpu} color={cpuColor} />
-          </Card>
-        </Col>
+        <div className="stat-card stat-card-cpu">
+          <div className="stat-head">
+            <span className="stat-icon"><ControlOutlined /></span>
+            <span className="stat-name">CPU</span>
+          </div>
+          <div className="stat-value">{info.cpu_usage.toFixed(1)}%</div>
+          <div className="stat-sub">{info.cpu_name || "N/A"}</div>
+          <div className="stat-chart"><Sparkline data={history.cpu} color={cpuColor} /></div>
+        </div>
+
         {/* RAM */}
-        <Col span={4}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <ThunderboltOutlined style={{ color: ramColor }} />
-              {t("dashboard.ram")}
-            </div>
-            <div className="dash-card-value" style={{ color: ramColor }}>
-              {(info.ram_used / 1073741824).toFixed(1)}
-              <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>
-                {" "}
-                / {(info.ram_total / 1073741824).toFixed(1)} GB
-              </span>
-            </div>
-            <div className="dash-card-sub">{ramPct}% đang sử dụng</div>
-            <Sparkline data={history.ram} color={ramColor} />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <div className="stat-head">
+            <span className="stat-icon"><DeploymentUnitOutlined /></span>
+            <span className="stat-name">RAM</span>
+          </div>
+          <div className="ring-wrap">
+            <Ring value={ramPct} color={ramColor}>
+              <div className="ring-num">{ramPct}%</div>
+              <div className="ring-cap">{fmtBytes(info.ram_used)}</div>
+            </Ring>
+          </div>
+          <div className="stat-cap">{fmtBytes(info.ram_used)} / {fmtBytes(info.ram_total)}</div>
+        </div>
+
         {/* Disk */}
-        <Col span={5}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <HddOutlined style={{ color: diskColor }} />
-              {t("dashboard.disk")}
-            </div>
-            <div className="dash-card-value" style={{ color: diskColor }}>
-              {(info.disk_free / 1073741824).toFixed(1)}
-              <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>
-                {" "}
-                / {(info.disk_total / 1073741824).toFixed(1)} GB
-              </span>
-            </div>
-            <div className="dash-card-sub">
-              {info.disk_info.slice(0, 2).map((d) => (
-                <div key={d.name}>
-                  {d.name}: {(d.free_bytes / 1073741824).toFixed(0)} GB trống
-                </div>
-              ))}
-            </div>
-            <Sparkline data={history.ram} color={diskColor} />
-          </Card>
-        </Col>
+        <div className="stat-card">
+          <div className="stat-head">
+            <span className="stat-icon"><HddOutlined /></span>
+            <span className="stat-name">Ổ Đĩa C:</span>
+          </div>
+          <div className="ring-wrap">
+            <Ring value={diskPct} color={diskColor}>
+              <div className="ring-num">{diskPct}%</div>
+              <div className="ring-cap">{fmtBytes(diskUsed)} đã dùng</div>
+            </Ring>
+          </div>
+          <div className="stat-cap">💾 Trống {fmtBytes(info.disk_free)}</div>
+        </div>
+
         {/* GPU */}
-        <Col span={5}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <RiseOutlined style={{ color: "#c084fc" }} />
-              {t("dashboard.gpu")}
-            </div>
-            <div className="dash-card-value" style={{ color: "#c084fc" }}>
-              {info.gpu_clock_mhz ? fmtGHz(info.gpu_clock_mhz) : "—"}
-            </div>
-            <div className="dash-card-sub">{info.gpu_name || "N/A"}</div>
-            <div className="dash-card-sub">🌡 {gpuTempText}</div>
-            <Sparkline data={history.gpu} color="#c084fc" />
-          </Card>
-        </Col>
+        <div className="stat-card stat-card-gpu">
+          <div className="stat-head">
+            <span className="stat-icon"><ExpandOutlined /></span>
+            <span className="stat-name">GPU</span>
+          </div>
+          <div className="stat-value">{gpuPct}%</div>
+          <div className="stat-sub">{info.gpu_name || "N/A"}</div>
+          <div className="stat-chart"><Sparkline data={history.gpu} color={gpuColor} /></div>
+        </div>
+
         {/* Health */}
-        <Col span={5}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <ApiOutlined style={{ color: healthColor }} />
-              {t("dashboard.health")}
+        <div className="stat-card stat-card-health">
+          <div className="stat-head">
+            <span className="stat-icon"><HeartOutlined /></span>
+            <span className="stat-name">Điểm Sức Khỏe</span>
+          </div>
+          <div className="ring-wrap">
+            <Ring value={health} color={healthColor}>
+              <div className="ring-num">{health}</div>
+              <div className="ring-cap">/100</div>
+            </Ring>
+          </div>
+          <div className="stat-cap">{health > 70 ? "Tuyệt vời" : health > 40 ? "Khá ổn" : "Cần tối ưu"}</div>
+        </div>
+      </div>
+
+      {/* Bottom: report + tools */}
+      <div className="bottom-grid">
+        {/* Báo cáo chi tiết */}
+        <div className="panel">
+          <h3 className="panel-title"><BarChartOutlined style={{ color: "#22d3ee" }} /> Báo cáo chi tiết</h3>
+          <div className="report-grid">
+            <div className="report-item">
+              <span className="report-label">CPU tần số</span>
+              <span className="report-value">{fmtGHz(info.cpu_clock_mhz)}</span>
             </div>
-            <SemiGauge value={health} color={healthColor} />
-            <div className="dash-card-sub" style={{ textAlign: "center" }}>
-              {health > 70 ? "Tuyệt vời" : health > 40 ? "Khá ổn" : "Cần tối ưu"}
+            <div className="report-item">
+              <span className="report-label">CPU nhiệt độ</span>
+              <span className="report-value">{info.cpu_temp_c > 0 ? `${info.cpu_temp_c.toFixed(0)}°C` : "N/A"}</span>
             </div>
-          </Card>
-        </Col>
-      </Row>
-      <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
-        <Col span={12}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <WindowsOutlined style={{ color: "#60a5fa" }} />
-              {t("dashboard.os")}
+            <div className="report-item">
+              <span className="report-label">GPU</span>
+              <span className="report-value">{info.gpu_name || "N/A"}</span>
             </div>
-            <div style={{ color: "#e2e8f0", fontSize: 14 }}>{info.os_version}</div>
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card size="small" style={cardStyle} styles={{ body: { padding: 16 } }}>
-            <div className="dash-card-title">
-              <ClockCircleOutlined style={{ color: "#34d399" }} />
-              {t("dashboard.uptime")}
+            <div className="report-item">
+              <span className="report-label">GPU tần số</span>
+              <span className="report-value">{fmtGHz(info.gpu_clock_mhz)}</span>
             </div>
-            <div style={{ color: "#e2e8f0", fontSize: 14 }}>
-              {Math.floor(info.uptime_seconds / 3600)}h{" "}
-              {Math.floor((info.uptime_seconds % 3600) / 60)}m
+            <div className="report-item">
+              <span className="report-label">Hệ điều hành</span>
+              <span className="report-value">{info.os_version}</span>
             </div>
-          </Card>
-        </Col>
-      </Row>
+            <div className="report-item">
+              <span className="report-label">Uptime</span>
+              <span className="report-value">{uptimeH}h {uptimeM}m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Công cụ khuyến nghị */}
+        <div className="panel">
+          <h3 className="panel-title"><BulbOutlined style={{ color: "#fbbf24" }} /> Công cụ khuyến nghị</h3>
+          <div className="rec-list">
+            {recommendations.slice(0, 3).map((r, i) => (
+              <div key={i} className="rec-item">
+                <div className="rec-icon">{r.icon}</div>
+                <div className="rec-body">
+                  <div className="rec-top">
+                    <span className="rec-title">{r.title}</span>
+                    <span className="rec-tag" style={r.tagStyle}>{r.tag}</span>
+                  </div>
+                  <p className="rec-desc">{r.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

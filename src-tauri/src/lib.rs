@@ -25,6 +25,7 @@ pub struct SystemInfo {
     pub gpu_name: String,
     pub gpu_clock_mhz: u64,
     pub gpu_temp_c: f64,
+    pub gpu_usage: f64,
     pub os_version: String,
     pub uptime_seconds: u64,
 }
@@ -75,7 +76,7 @@ fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![commands::get_sys_info, commands::get_disk_clean_candidates, commands::run_disk_clean, commands::run_benchmark])
+        .invoke_handler(tauri::generate_handler![commands::get_sys_info, commands::get_disk_clean_candidates, commands::run_disk_clean, commands::run_benchmark, commands::clean_memory, commands::gaming::get_gaming_tweaks, commands::gaming::apply_gaming_tweak, commands::gaming_advanced::get_gaming_presets, commands::gaming_advanced::apply_gaming_preset, commands::gaming_advanced::start_gaming_session, commands::gaming_advanced::stop_gaming_session, commands::gaming_advanced::get_gaming_session, commands::gaming_advanced::set_game_profile, commands::gaming_advanced::get_game_profile, commands::gaming_advanced::verify_gaming_tweaks, commands::diagnostics::repair_system_files, commands::diagnostics::run_chkdsk_scan, commands::diagnostics::get_recent_events, commands::diagnostics::get_drive_smart])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

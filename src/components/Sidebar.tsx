@@ -1,39 +1,59 @@
-import { Menu } from "antd";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
-  DashboardOutlined,
+  ThunderboltOutlined,
   ClearOutlined,
   SafetyOutlined,
-  ThunderboltOutlined,
-  CloudServerOutlined,
+  ExperimentOutlined,
   SettingOutlined,
+  PlayCircleOutlined,
+  MedicineBoxOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+
+const NAV_ITEMS = [
+  { key: "/", icon: <ThunderboltOutlined />, label: "Tối ưu hóa" },
+  { key: "/disk", icon: <ClearOutlined />, label: "Dọn dẹp nhanh" },
+  { key: "/debloat", icon: <SafetyOutlined />, label: "Debloat" },
+  { key: "/memory", icon: <ExperimentOutlined />, label: "Dọn RAM" },
+  { key: "/services", icon: <SettingOutlined />, label: "Dịch vụ & Khởi động" },
+  { key: "/gaming", icon: <PlayCircleOutlined />, label: "Tối ưu Gaming" },
+  { key: "/diagnostics", icon: <MedicineBoxOutlined />, label: "Chẩn đoán & Sửa" },
+  { key: "/settings", icon: <ToolOutlined />, label: "Công cụ nâng cao" },
+];
 
 export default function Sidebar() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-
   const selected = "/" + (location.pathname.split("/")[1] || "");
 
-  const items = [
-    { key: "/", icon: <DashboardOutlined />, label: t("nav.dashboard") },
-    { key: "/disk", icon: <ClearOutlined />, label: t("nav.disk") },
-    { key: "/debloat", icon: <SafetyOutlined />, label: t("nav.debloat") },
-    { key: "/memory", icon: <ThunderboltOutlined />, label: t("nav.memory") },
-    { key: "/services", icon: <CloudServerOutlined />, label: t("nav.services") },
-    { key: "/settings", icon: <SettingOutlined />, label: t("nav.settings") },
-  ];
-
   return (
-    <Menu
-      theme="dark"
-      mode="inline"
-      selectedKeys={[selected]}
-      items={items}
-      onClick={({ key }) => navigate(key)}
-      style={{ height: "100vh", background: "transparent", borderInlineEnd: "none" }}
-    />
+    <aside className="sidebar">
+      <div>
+        <div className="sidebar-logo">
+          <div className="sidebar-logo-icon">
+            <ThunderboltOutlined />
+          </div>
+          <span className="sidebar-logo-text">WinOptimizer</span>
+        </div>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map((item) => {
+            const active = selected === item.key;
+            return (
+              <a
+                key={item.key}
+                href="#"
+                className={`sidebar-item ${active ? "sidebar-item-active" : ""}`}
+                onClick={(e) => { e.preventDefault(); navigate(item.key); }}
+              >
+                <div className={`sidebar-item-icon ${active ? "sidebar-item-icon-active" : ""}`}>
+                  {item.icon}
+                </div>
+                <span>{item.label}</span>
+              </a>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
   );
 }

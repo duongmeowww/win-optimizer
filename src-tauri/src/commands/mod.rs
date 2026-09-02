@@ -1,18 +1,29 @@
 use super::*;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::sync::{Mutex, OnceLock};
+
+pub mod gaming;
+pub mod gaming_advanced;
+pub mod diagnostics;
 
 #[tauri::command]
-pub fn run_benchmark() -> String {
+pub async fn run_benchmark() -> String {
+    tauri::async_runtime::spawn_blocking(run_benchmark_inner)
+        .await
+        .unwrap_or_default()
+}
+
+fn run_benchmark_inner() -> String {
     let ps = r#"
 $ErrorActionPreference = 'SilentlyContinue'
 try {
-    $ramAvailMB = (Get-Counter '\Memory\Available MBytes' -SampleInterval 1 -MaxSamples 2 |
+    $ramAvailMB = (Get-Counter '\Memory\Available MBytes' -MaxSamples 1 |
         Select-Object -ExpandProperty CounterSamples |
         Measure-Object -Property CookedValue -Average).Average
-    $diskActivePct = (Get-Counter '\PhysicalDisk(_Total)\% Disk Time' -SampleInterval 1 -MaxSamples 2 |
+    $diskActivePct = (Get-Counter '\PhysicalDisk(_Total)\% Disk Time' -MaxSamples 1 |
         Select-Object -ExpandProperty CounterSamples |
         Measure-Object -Property CookedValue -Average).Average
-    $cpuPct = (Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 2 |
+    $cpuPct = (Get-Counter '\Processor(_Total)\% Processor Time' -MaxSamples 1 |
         Select-Object -ExpandProperty CounterSamples |
         Measure-Object -Property CookedValue -Average).Average
     $appData = "$env:LOCALAPPDATA\Microsoft\Windows"
@@ -66,76 +77,176 @@ pub struct SystemInfo {
     pub gpu_name: String,
     pub gpu_clock_mhz: u64,
     pub gpu_temp_c: f64,
+    pub gpu_usage: f64,
     pub os_version: String,
     pub uptime_seconds: u64,
 }
 
-#[tauri::command]
-pub fn get_sys_info() -> SystemInfo {
-    let ps_main = sh_timeout("powershell", &[
+/// Dữ liệu tĩnh (ít thay đổi) — cache lại để không phải query PowerShell/WMI mỗi lần poll.
+struct SysSnapshot {
+    fetched: Instant,
+    cpu_name: String,
+    os_version: String,
+    boot_epoch_s: u64,
+    disk_total: u64,
+    disk_free: u64,
+    disk_info: Vec<DiskInfo>,
+    gpu_name: String,
+    gpu_clock_mhz: u64,
+}
+
+static SYS_SNAPSHOT: OnceLock<Mutex<SysSnapshot>> = OnceLock::new();
+static SYS: OnceLock<Mutex<System>> = OnceLock::new();
+const SNAPSHOT_TTL: Duration = Duration::from_secs(30);
+
+fn fetch_snapshot() -> SysSnapshot {
+    let ps = sh_timeout("powershell", &[
         "-NoProfile", "-Command", r#"
+$ErrorActionPreference = 'SilentlyContinue'
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-$os = Get-CimInstance Win32_OperatingSystem
+$os  = Get-CimInstance Win32_OperatingSystem
 $disks = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'
-$ram = Get-CimInstance Win32_OperatingSystem
-$dLines = @()
-$dTotal = [uint64]0; $dFree = [uint64]0
+$gpus = Get-CimInstance Win32_VideoController | Select-Object Name, CurrentClockSpeed | Select-Object -First 1
+$dLines = @(); $dTotal = [uint64]0; $dFree = [uint64]0
 foreach ($d in $disks) {
     $t = [uint64]$d.Size; $f = [uint64]$d.FreeSpace
     $dTotal += $t; $dFree += $f
     $dLines += "$($d.DeviceID)|$t|$f"
 }
+$boot = [datetime]$os.LastBootUpTime
+$uptimeSec = [int64]((Get-Date) - $boot).TotalSeconds
 Write-Output "CPU_NAME=$($cpu.Name)"
-Write-Output "RAM_TOTAL_KB=$($ram.TotalVisibleMemorySize)"
-Write-Output "RAM_FREE_KB=$($ram.FreePhysicalMemory)"
 Write-Output "OS=$($os.Caption) $($os.Version)"
-Write-Output "UPTIME=$($os.LastBootUpTime)"
+Write-Output "UPTIME=$uptimeSec"
 foreach ($dl in $dLines) { Write-Output "DISK=$dl" }
-Write-Output "DISK_TOTAL=$dTotal"
-Write-Output "DISK_FREE=$dFree"
+Write-Output "DISK_TOTAL=$dTotal"; Write-Output "DISK_FREE=$dFree"
+if ($gpus) { Write-Output "GPU=$($gpus.Name)|$($gpus.CurrentClockSpeed)" } else { Write-Output 'GPU=N/A|0' }
 "#
     ], PS_TIMEOUT);
-    let ps_gpu = sh_timeout("powershell", &[
-        "-NoProfile", "-Command",
-        r#"
-            $gpus = Get-CimInstance Win32_VideoController | Select-Object Name, CurrentClockSpeed | Select-Object -First 1
-            if ($gpus) { Write-Output "$($gpus.Name)|$($gpus.CurrentClockSpeed)" } else { Write-Output 'N/A|0' }
-        "#,
-    ], PS_TIMEOUT);
-    let mut cpu_name = String::new();
-    let mut ram_total_kb: u64 = 0;
-    let mut ram_free_kb: u64 = 0;
-    let mut uptime_seconds: u64 = 0;
-    let mut disk_total: u64 = 0;
-    let mut disk_free: u64 = 0;
-    let mut disk_info: Vec<DiskInfo> = Vec::new();
-    let mut os_version = String::new();
-    for line in ps_main.lines() {
+
+    let mut s = SysSnapshot {
+        fetched: Instant::now(),
+        cpu_name: String::new(),
+        os_version: String::new(),
+        boot_epoch_s: 0,
+        disk_total: 0,
+        disk_free: 0,
+        disk_info: Vec::new(),
+        gpu_name: String::new(),
+        gpu_clock_mhz: 0,
+    };
+    for line in ps.lines() {
         match line {
-            s if s.starts_with("CPU_NAME=") => { cpu_name = s[9..].trim().to_string(); }
-            s if s.starts_with("RAM_TOTAL_KB=") => { ram_total_kb = s[12..].trim().parse().unwrap_or(0); }
-            s if s.starts_with("RAM_FREE_KB=") => { ram_free_kb = s[11..].trim().parse().unwrap_or(0); }
-            s if s.starts_with("UPTIME=") => { let boot = s[7..].trim(); if let Ok(d) = chrono::DateTime::parse_from_rfc3339(boot) { uptime_seconds = chrono::Utc::now().signed_duration_since(d).num_seconds() as u64; } }
-            s if s.starts_with("DISK=") => { let p = s[5..].split('|').collect::<Vec<_>>(); if p.len() == 3 { disk_info.push(DiskInfo { name: p[0].to_string(), total_bytes: p[1].parse().unwrap_or(0), free_bytes: p[2].parse().unwrap_or(0) }); } }
-            s if s.starts_with("DISK_TOTAL=") => { disk_total = s[10..].trim().parse().unwrap_or(0); }
-            s if s.starts_with("DISK_FREE=") => { disk_free = s[9..].trim().parse().unwrap_or(0); }
-            s if s.starts_with("OS=") => { os_version = s[3..].trim().to_string(); }
+            l if l.starts_with("CPU_NAME=") => s.cpu_name = l[9..].trim().to_string(),
+            l if l.starts_with("OS=") => s.os_version = l[3..].trim().to_string(),
+            l if l.starts_with("UPTIME=") => {
+                if let Ok(v) = l[7..].trim().parse::<u64>() {
+                    s.boot_epoch_s = chrono::Utc::now().timestamp().max(0) as u64 - v;
+                }
+            }
+            l if l.starts_with("DISK=") => {
+                let p: Vec<&str> = l[5..].split('|').collect();
+                if p.len() == 3 {
+                    s.disk_info.push(DiskInfo {
+                        name: p[0].to_string(),
+                        total_bytes: p[1].parse().unwrap_or(0),
+                        free_bytes: p[2].parse().unwrap_or(0),
+                    });
+                }
+            }
+            l if l.starts_with("DISK_TOTAL=") => {
+                if let Some((_, v)) = l.split_once('=') {
+                    s.disk_total = v.trim().parse().unwrap_or(0);
+                }
+            }
+            l if l.starts_with("DISK_FREE=") => {
+                if let Some((_, v)) = l.split_once('=') {
+                    s.disk_free = v.trim().parse().unwrap_or(0);
+                }
+            }
+            l if l.starts_with("GPU=") => {
+                let p: Vec<&str> = l[4..].split('|').collect();
+                s.gpu_name = p.first().map(|x| x.trim().to_string()).unwrap_or_default();
+                s.gpu_clock_mhz = p.get(1).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
+            }
             _ => {}
         }
     }
-    let (gpu_name, gpu_clock) = {
-        let parts: Vec<&str> = ps_gpu.split('|').collect();
-        (parts.first().map(|s| s.trim().to_string()).unwrap_or_default(),
-         parts.get(1).and_then(|s| s.trim().parse().ok()).unwrap_or(0))
-    };
-    let ram_total = ram_total_kb * 1024;
-    let ram_free = ram_free_kb * 1024;
-    let ram_used = ram_total - ram_free;
-    let cpu_usage_kind = sysinfo::CpuRefreshKind::new().with_cpu_usage();
-    let mut sys = System::new_with_specifics(sysinfo::RefreshKind::new().with_cpu(cpu_usage_kind));
-    sys.refresh_cpu_usage();
-    let cpu_usage = sys.global_cpu_info().cpu_usage() as f64;
-    SystemInfo { cpu_usage, cpu_name, cpu_clock_mhz: 0, cpu_temp_c: 0.0, ram_total, ram_used, disk_total, disk_free, disk_info, gpu_name, gpu_clock_mhz: gpu_clock, gpu_temp_c: 0.0, os_version, uptime_seconds }
+    s
+}
+
+#[tauri::command]
+pub async fn get_sys_info() -> SystemInfo {
+    tauri::async_runtime::spawn_blocking(|| {
+        let snap_mutex = SYS_SNAPSHOT.get_or_init(|| Mutex::new(SysSnapshot {
+            fetched: Instant::now() - SNAPSHOT_TTL,
+            cpu_name: String::new(),
+            os_version: String::new(),
+            boot_epoch_s: 0,
+            disk_total: 0,
+            disk_free: 0,
+            disk_info: Vec::new(),
+            gpu_name: String::new(),
+            gpu_clock_mhz: 0,
+        }));
+        let sys_mutex = SYS.get_or_init(|| Mutex::new(System::new()));
+
+        // Chỉ chạy PowerShell/WMI nặng khi cache hết hạn (mỗi 30s)
+        let mut snap = snap_mutex.lock().unwrap();
+        if snap.fetched.elapsed() > SNAPSHOT_TTL {
+            *snap = fetch_snapshot();
+        }
+
+        // GPU utilization động (nhẹ, mỗi lần gọi) — Get-Counter nhanh ~100ms
+        let gpu_usage = fetch_gpu_usage();
+
+        // CPU + RAM lấy từ sysinfo (native, nhẹ) ngay mỗi lần gọi
+        let mut sys = sys_mutex.lock().unwrap();
+        sys.refresh_cpu_usage();
+        sys.refresh_memory();
+        let cpu_usage = sys.global_cpu_info().cpu_usage() as f64;
+        let ram_total = sys.total_memory();
+        let ram_used = sys.used_memory();
+
+        let uptime_seconds = chrono::Utc::now().timestamp().max(0) as u64 - snap.boot_epoch_s;
+        SystemInfo {
+            cpu_usage,
+            cpu_name: snap.cpu_name.clone(),
+            cpu_clock_mhz: 0,
+            cpu_temp_c: 0.0,
+            ram_total,
+            ram_used,
+            disk_total: snap.disk_total,
+            disk_free: snap.disk_free,
+            disk_info: snap.disk_info.clone(),
+            gpu_name: snap.gpu_name.clone(),
+            gpu_clock_mhz: snap.gpu_clock_mhz,
+            gpu_temp_c: 0.0,
+            gpu_usage,
+            os_version: snap.os_version.clone(),
+            uptime_seconds,
+        }
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// Lấy GPU utilization tổng hợp (sum tất cả GPU engine, clamp 0-100).
+/// Dùng `Get-Counter` (nhanh ~100-200ms), không phải WMI nặng.
+fn fetch_gpu_usage() -> f64 {
+    let ps = r#"
+$ErrorActionPreference = 'SilentlyContinue'
+$samples = Get-Counter '\GPU Engine(*)\Utilization Percentage' -MaxSamples 1 -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty CounterSamples | Where-Object { $_.CookedValue -gt 0 }
+if ($samples) {
+    $total = ($samples | Measure-Object -Property CookedValue -Sum).Sum
+    [math]::Min(100, [math]::Round($total, 1))
+} else {
+    0
+}
+"#;
+    let out = sh_timeout("powershell", &["-NoProfile", "-Command", ps], PS_TIMEOUT);
+    out.trim().parse::<f64>().unwrap_or(0.0)
 }
 
 
@@ -260,4 +371,61 @@ pub fn run_disk_clean(ids: Vec<String>) -> u64 {
         if let Ok(v) = out.trim().parse::<u64>() { freed += v; }
     }
     freed
+}
+
+#[derive(serde::Serialize, Default)]
+pub struct MemCleanResult {
+    pub freed_kb: u64,
+    pub before_avail_kb: u64,
+    pub after_avail_kb: u64,
+    pub processes_trimmed: u32,
+}
+
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+use windows::Win32::System::ProcessStatus::EmptyWorkingSet;
+use windows::Win32::System::Threading::{OpenProcess, PROCESS_ACCESS_RIGHTS, PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA, PROCESS_VM_OPERATION};
+
+fn mem_available_kb() -> u64 {
+    unsafe {
+        let mut st = MEMORYSTATUSEX { dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32, ..Default::default() };
+        if GlobalMemoryStatusEx(&mut st).is_err() {}
+        let avail = st.ullAvailPhys as u64;
+        avail / 1024
+    }
+}
+
+/// Lấy danh sách PID có RAM > ngưỡng (MB) qua WMI — reliable, không cần psapi EnumProcesses.
+fn heavy_pids(threshold_mb: u64) -> Vec<u32> {
+    let ps = format!(
+        r#"
+$ErrorActionPreference='SilentlyContinue'
+Get-Process | Where-Object {{ $_.WorkingSet64 -gt {}MB }} | ForEach-Object {{ $_.Id }}
+"#,
+        threshold_mb
+    );
+    let out = sh_timeout("powershell", &["-NoProfile", "-Command", &ps], Duration::from_secs(15));
+    out.lines().filter_map(|l| l.trim().parse::<u32>().ok()).collect()
+}
+
+#[tauri::command]
+pub fn clean_memory(threshold_mb: Option<u32>) -> MemCleanResult {
+    let threshold = threshold_mb.unwrap_or_else(|| 50u32);
+    let before = mem_available_kb();
+    let pids = heavy_pids(threshold as u64);
+    let mut trimmed = 0u32;
+    let rights: PROCESS_ACCESS_RIGHTS =
+        PROCESS_QUERY_INFORMATION | PROCESS_SET_QUOTA | PROCESS_VM_OPERATION;
+    for pid in pids {
+        if let Ok(h) = unsafe { OpenProcess(rights, false, pid) } {
+            let _ = unsafe { EmptyWorkingSet(h) };
+            let _ = unsafe { CloseHandle(h) };
+            trimmed += 1;
+        }
+    }
+    // chờ một chút để kernel xử lý release trước khi đo after
+    std::thread::sleep(Duration::from_millis(250));
+    let after = mem_available_kb();
+    let freed = after.saturating_sub(before);
+    MemCleanResult { freed_kb: freed, before_avail_kb: before, after_avail_kb: after, processes_trimmed: trimmed }
 }
