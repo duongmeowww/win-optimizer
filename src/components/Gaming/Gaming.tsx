@@ -66,7 +66,10 @@ function TweaksTab() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<GamingTweak | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [msg, msgCtx] = message.useMessage();
+
+  const ADMIN_NEEDED = ["hags", "sys_resp", "mmcss"]; // HKLM protected keys
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,6 +78,7 @@ function TweaksTab() {
     finally { setLoading(false); }
   }, [msg]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { invoke<boolean>("is_admin").then(setIsAdmin).catch(() => {}); }, []);
 
   const toggle = useCallback(async (t: GamingTweak, action: "apply" | "revert") => {
     setBusy(t.id);
@@ -113,6 +117,11 @@ function TweaksTab() {
       }
     >
       {msgCtx}
+      {!isAdmin && (
+        <Alert style={{ marginBottom: 12 }} type="warning" showIcon
+          message="Đang chạy không có quyền admin — 3 tweak (HAGS, SystemResponsiveness, MMCSS) cần admin để sửa registry HKLM protected."
+          action={<Button size="small" danger onClick={() => invoke("relaunch_admin")}>Chạy lại với quyền admin</Button>} />
+      )}
       {order.map((cat) => {
         const items = groups[cat] ?? [];
         if (!items.length) return null;
@@ -132,13 +141,14 @@ function TweaksTab() {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <b>{t.label}</b>
-                      <Switch checked={t.active} loading={busy === t.id} disabled={busy !== null} onChange={(c) => handleSwitch(t, c)} />
+                      <Switch checked={t.active} loading={busy === t.id} disabled={busy !== null || (!isAdmin && ADMIN_NEEDED.includes(t.id))} onChange={(c) => handleSwitch(t, c)} />
                     </div>
                     <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 6, minHeight: 48 }}>{t.desc}</div>
                     <div style={{ marginTop: 8, display: "flex", gap: 6, alignItems: "center" }}>
                       <Tag color={t.active ? "success" : "default"} icon={t.active ? <CheckCircleOutlined /> : undefined}>
                         {t.active ? "Đang bật" : "Tắt"}
                       </Tag>
+                      {!isAdmin && ADMIN_NEEDED.includes(t.id) && <Tooltip title="Cần chạy app với quyền admin để sửa registry này"><Tag color="orange">Cần admin</Tag></Tooltip>}
                       {t.tradeoff && <Tooltip title="Đánh đổi bảo mật lấy hiệu năng"><Tag color="volcano">Trade-off</Tag></Tooltip>}
                     </div>
                   </Card>
@@ -208,7 +218,7 @@ function PresetsTab() {
             actions={[
               <Space key="a">
                 <Button type="primary" icon={<PlayCircleOutlined />} loading={busy === p.id}
-                  onClick={() => Modal.confirm({ title: `Áp preset ${p.label}?`, content: p.desc, onOk: () => run(p.id, "apply") })}>
+                  onClick={() => run(p.id, "apply")}>
                   Áp dụng
                 </Button>
                 <Button icon={<UndoOutlined />} onClick={() => run(p.id, "revert")}>Hoàn tác</Button>

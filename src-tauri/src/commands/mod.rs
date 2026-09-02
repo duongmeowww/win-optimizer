@@ -5,6 +5,10 @@ use std::sync::{Mutex, OnceLock};
 pub mod gaming;
 pub mod gaming_advanced;
 pub mod diagnostics;
+pub mod advanced;
+pub mod debloat;
+pub mod services_startup;
+pub mod memory_cleaner;
 
 #[tauri::command]
 pub async fn run_benchmark() -> String {

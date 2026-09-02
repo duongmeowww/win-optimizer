@@ -17,5 +17,11 @@ export default defineConfig({
   build: {
     target: "es2021",
     outDir: "dist",
+    // Relative paths so assets resolve under tauri://localhost/
+    // (without this, /assets/... 404s or hits http://localhost refused)
+    assetsDir: "assets",
+    emptyOutDir: true,
   },
+  // base: "" => Vite emits ./assets/... instead of /assets/...
+  base: "",
 });

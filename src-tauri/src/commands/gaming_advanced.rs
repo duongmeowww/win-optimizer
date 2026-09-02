@@ -1,6 +1,34 @@
-use super::*;
-use super::gaming::{ps_quiet, reg_val};
+use crate::commands::gaming::ps_quiet;
 use tauri::{AppHandle, Emitter};
+use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use winreg::enums::*;
+use winreg::RegKey;
+
+/// App có đang chạy với quyền admin (elevated) không?
+#[tauri::command]
+pub fn is_admin() -> bool {
+    let out = ps_quiet("(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)", 10);
+    out.trim() == "True"
+}
+
+/// Relaunch app với quyền admin (UAC prompt), đóng instance hiện tại.
+#[tauri::command]
+pub fn relaunch_admin(app: AppHandle) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_str = exe.to_string_lossy().to_string();
+    // runas → UAC prompt
+    let _ = Command::new("powershell")
+        .args(["-Command", &format!("Start-Process -FilePath '{0}' -Verb RunAs", exe_str.replace('\'', "''"))])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    // đóng instance hiện tại sau 1s
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        app.exit(0);
+    });
+    Ok(())
+}
 
 // ============ Gaming Profile Presets ============
 
@@ -17,8 +45,9 @@ pub struct GamingPreset {
 }
 
 #[tauri::command]
-pub fn get_gaming_presets() -> Vec<GamingPreset> {
-    let active: Vec<String> = super::gaming::get_gaming_tweaks()
+pub async fn get_gaming_presets() -> Result<Vec<GamingPreset>, String> {
+    let tweaks_list = super::gaming::get_gaming_tweaks().await?;
+    let active: Vec<String> = tweaks_list
         .into_iter()
         .filter(|t| t.active)
         .map(|t| t.id)
@@ -26,7 +55,7 @@ pub fn get_gaming_presets() -> Vec<GamingPreset> {
 
     let count = |ids: &[&str]| ids.iter().filter(|i| active.contains(&i.to_string())).count();
 
-    vec![
+    Ok(vec![
         GamingPreset {
             id: "performance".into(),
             label: "Performance".into(),
@@ -47,12 +76,12 @@ pub fn get_gaming_presets() -> Vec<GamingPreset> {
             active_count: count(&["hags", "game_mode", "game_dvr", "nagle", "net_throttle", "sys_resp", "win32prio", "mmcss", "mouse", "ult_power", "core_park", "tdr"]),
             total: 12,
         },
-    ]
+    ])
 }
 
 #[tauri::command]
 pub async fn apply_gaming_preset(app: AppHandle, id: String, action: String) -> Result<(bool, String), String> {
-    let presets = get_gaming_presets();
+    let presets = get_gaming_presets().await?;
     let p = presets.into_iter().find(|x| x.id == id).ok_or("Preset không tồn tại")?;
     let tweaks = p.tweaks.clone();
     let label = p.label.clone();
@@ -64,14 +93,21 @@ pub async fn apply_gaming_preset(app: AppHandle, id: String, action: String) -> 
         let mut fails: Vec<String> = Vec::new();
         let total = tweaks.len();
         for (i, tid) in tweaks.iter().enumerate() {
-            let r = super::gaming::apply_gaming_tweak(tid.clone(), action_inner.clone());
+            let r = futures::executor::block_on(super::gaming::apply_gaming_tweak(tid.clone(), action_inner.clone()));
             let success = r.is_ok();
+            
+            // Get label from async context
+            let t_list = futures::executor::block_on(super::gaming::get_gaming_tweaks());
+            let t_label = t_list.ok()
+                .and_then(|list| list.into_iter().find(|t| t.id == *tid).map(|t| t.label))
+                .unwrap_or_else(|| tid.clone());
+
             let _ = app.emit("preset-progress", serde_json::json!({
                 "index": i + 1,
                 "total": total,
                 "id": tid,
                 "ok": success,
-                "label": super::gaming::get_gaming_tweaks().into_iter().find(|t| t.id == *tid).map(|t| t.label).unwrap_or_else(|| tid.clone()),
+                "label": t_label,
                 "msg": r.map(|(_, m)| m).unwrap_or_else(|e| e),
             }));
             if success { ok += 1; } else { fails.push(tid.clone()); }
@@ -123,8 +159,7 @@ pub fn start_gaming_session(apps: Vec<String>) -> SessionState {
     );
     ps_quiet(&dup, 15);
 
-    // 3. Suspend background apps (tên process) — Windows 11 suspend API qua PowerShell không có, dùng Suspend-Process via NtSuspendProcess? Đơn giản: giảm priority + not suspend.
-    //    Dùng PowerShell job? Để an toàn, chỉ giảm priority xuống low cho các app nặng user chỉ định.
+    // 3. Suspend background apps
     st.suspended.clear();
     for a in &apps {
         let ps = format!("Get-Process -Name '{0}' -ErrorAction SilentlyContinue | ForEach-Object {{ $_.PriorityClass = 'Idle' }}", a);
@@ -175,11 +210,19 @@ pub struct GameProfile {
     pub exists: bool,
 }
 
-const HKCU_GPU_PREFS: &str = "HKCU:\\SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences";
-const HKCU_APPCOMPAT: &str = "HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers";
-
 fn exe_name(path: &str) -> String {
     std::path::Path::new(path).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "game".into())
+}
+
+/// Đọc registry native helper cho game profile
+fn reg_val_hkcu(path: &str, name: &str) -> String {
+    let hk = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(key) = hk.open_subkey(path) {
+        if let Ok(val) = key.get_value::<String, _>(name) {
+            return val;
+        }
+    }
+    String::new()
 }
 
 /// Lưu/đọc profile cho 1 game (dựa trên registry HKCU — per-user, không admin).
@@ -187,31 +230,28 @@ fn exe_name(path: &str) -> String {
 pub fn set_game_profile(path: String, gpu_pref: u8, _fso_off: bool, run_as_admin: bool) -> Result<(bool, String), String> {
     let name = exe_name(&path);
 
-    // 1. GPU preference (HKCU UserGpuPreferences) — "exe_path" = "GpuPreference=2;"
+    // 1. GPU preference
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     if gpu_pref > 0 {
-        let ps = format!(
-            r#"New-Item -Path '{0}' -Force | Out-Null; Set-ItemProperty -Path '{0}' -Name '{1}' -Value 'GpuPreference={2};' -Type String"#,
-            HKCU_GPU_PREFS,
-            path.replace('\'', "''"),
-            gpu_pref
-        );
-        ps_quiet(&ps, 10);
+        if let Ok((key, _)) = hkcu.create_subkey("SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences") {
+            let _ = key.set_value(&path, &format!("GpuPreference={};", gpu_pref));
+        }
     } else {
-        let ps = format!(r#"Remove-ItemProperty -Path '{0}' -Name '{1}' -ErrorAction SilentlyContinue"#, HKCU_GPU_PREFS, path.replace('\'', "''"));
-        ps_quiet(&ps, 10);
+        if let Ok(key) = hkcu.open_subkey("SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences") {
+            let _ = key.delete_value(&path);
+        }
     }
 
-    // 2. FSO off: registry HKCU\System\GameConfigStore\Children — cần GUID, phức tạp. Dùng AppCompat Layers thay (đơn giản hoá): HighDPIAware + Disable fullscreen optimizations qua AppCompatFlag
-    //    AppCompat Layers: ~ HIGHDPIAWARE (FSO control qua OtherOptions). Để đơn giản dùng RUNASADMIN riêng.
-
-    // 3. Run-as-admin via AppCompat Layers (HKCU)
+    // 2. Run-as-admin via AppCompat Layers
     let compat_val = format!("~{}", if run_as_admin { "RUNASADMIN" } else { "" });
     if run_as_admin {
-        let ps = format!(r#"New-Item -Path '{0}' -Force | Out-Null; Set-ItemProperty -Path '{0}' -Name '{1}' -Value '{2}' -Type String"#, HKCU_APPCOMPAT, path.replace('\'', "''"), compat_val);
-        ps_quiet(&ps, 10);
+        if let Ok((key, _)) = hkcu.create_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers") {
+            let _ = key.set_value(&path, &compat_val);
+        }
     } else {
-        let ps = format!(r#"Remove-ItemProperty -Path '{0}' -Name '{1}' -ErrorAction SilentlyContinue"#, HKCU_APPCOMPAT, path.replace('\'', "''"));
-        ps_quiet(&ps, 10);
+        if let Ok(key) = hkcu.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers") {
+            let _ = key.delete_value(&path);
+        }
     }
 
     Ok((true, format!("Đã lưu profile '{}': GPU={}, RunAsAdmin={}", name, if gpu_pref == 2 { "High Perf" } else if gpu_pref == 1 { "Power Saving" } else { "Default" }, run_as_admin)))
@@ -220,16 +260,23 @@ pub fn set_game_profile(path: String, gpu_pref: u8, _fso_off: bool, run_as_admin
 /// Lấy profile hiện tại của 1 game từ registry.
 #[tauri::command]
 pub fn get_game_profile(path: String) -> GameProfile {
-    let gpu = {
-        let v = reg_val(HKCU_GPU_PREFS, "", &path);
-        if v.contains("GpuPreference=2") { 2 } else if v.contains("GpuPreference=1") { 1 } else { 0 }
+    let gpu_val = reg_val_hkcu("SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences", &path);
+    let gpu = if gpu_val.contains("GpuPreference=2") {
+        2
+    } else if gpu_val.contains("GpuPreference=1") {
+        1
+    } else {
+        0
     };
-    let admin = !reg_val(HKCU_APPCOMPAT, "", &path).is_empty();
+    
+    let compat_val = reg_val_hkcu("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers", &path);
+    let admin = compat_val.contains("RUNASADMIN");
+
     GameProfile {
         path: path.clone(),
         name: exe_name(&path),
         gpu_pref: gpu,
-        fso_off: false, // chưa hỗ trợ FSO registry phức tạp
+        fso_off: false,
         run_as_admin: admin,
         exists: gpu > 0 || admin,
     }
@@ -245,11 +292,18 @@ pub struct VerifyItem {
     pub expected: String,
 }
 
-/// Kiểm tra toàn bộ tweak nào đang active — pass/fail đọc lại từ hệ thống.
+/// Kiểm tra toàn bộ tweak nào đang active (Async).
 #[tauri::command]
-pub fn verify_gaming_tweaks() -> Vec<VerifyItem> {
-    super::gaming::get_gaming_tweaks()
+pub async fn verify_gaming_tweaks() -> Result<Vec<VerifyItem>, String> {
+    let tweaks_list = super::gaming::get_gaming_tweaks().await?;
+    let items = tweaks_list
         .into_iter()
-        .map(|t| VerifyItem { id: t.id.clone(), label: t.label, ok: t.active, expected: if t.active { "hoạt động" } else { "chưa kích hoạt" }.into() })
-        .collect()
+        .map(|t| VerifyItem {
+            id: t.id.clone(),
+            label: t.label,
+            ok: t.active,
+            expected: if t.active { "hoạt động" } else { "chưa kích hoạt" }.into()
+        })
+        .collect();
+    Ok(items)
 }

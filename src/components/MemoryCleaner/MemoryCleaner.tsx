@@ -46,6 +46,7 @@ export default function MemoryCleaner() {
   const [bench, setBench] = useState<BenchResult | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [benchLoading, setBenchLoading] = useState(false);
+  const [cleaningTemp, setCleaningTemp] = useState(false);
   const [autoClean, setAutoClean] = useState(false);
   const [threshold, setThreshold] = useState(2048); // MB
   const [msg, msgCtx] = message.useMessage();
@@ -87,10 +88,22 @@ export default function MemoryCleaner() {
     }
   }, [threshold, msg, runBench]);
 
+  const doCleanTemp = useCallback(async () => {
+    setCleaningTemp(true);
+    try {
+      const [ok, out] = await invoke<[boolean, string]>("run_memory_cleaner");
+      msg.success(ok ? "Dọn Temp/Prefetch xong" : "Lỗi: " + out);
+    } catch (e) {
+      msg.error("Lỗi dọn Temp: " + e);
+    } finally {
+      setCleaningTemp(false);
+    }
+  }, [msg]);
+
   // Load initial benchmark once
   useEffect(() => { runBench(); }, [runBench]);
 
-  // Auto-poll RAM each interval to refresh benchmark display
+  // Auto-clean every 10 seconds if enabled and RAM below threshold
   useEffect(() => {
     if (!autoClean) return;
     const t = setInterval(() => {
@@ -98,7 +111,7 @@ export default function MemoryCleaner() {
         doClean();
       }
       runBench();
-    }, 5000);
+    }, 10000);
     return () => clearInterval(t);
   }, [autoClean, bench, threshold, doClean, runBench]);
 
@@ -114,15 +127,14 @@ export default function MemoryCleaner() {
           </Space>
         }
         extra={
-          <Tooltip title="Tự động dọn khi RAM available < ngưỡng (đơn vị MB)">
-            <Space>
-              <span>Auto</span>
+          <Space>
+            <Tooltip title="Tự động dọn mỗi 10s khi RAM available < ngưỡng">
               <Switch size="small" checked={autoClean} onChange={setAutoClean} />
-            </Space>
-          </Tooltip>
+            </Tooltip>
+          </Space>
         }
       >
-        {/* RAM trước/sau */}
+        {/* RAM stats */}
         <Row gutter={[14, 14]} style={{ marginBottom: 16 }}>
           <Col span={8}>
             <Card size="small" hoverable onClick={() => runBench()} style={{ cursor: "zoom-in" }}>
@@ -179,17 +191,30 @@ export default function MemoryCleaner() {
           </Col>
         </Row>
 
-        {/* Action */}
+        {/* Action buttons */}
         <Row gutter={[14, 14]} style={{ marginBottom: 16 }}>
           <Col span={12}>
-            <Alert
-              type="info"
-              showIcon
-              banner
-              message="Dọn RAM bằng EmptyWorkingSet"
-              description="Gọi Windows API EmptyWorkingSet cho từng process RAM > ngưỡng, buông bỏ page không dùng. An toàn — không kill process nào."
-              style={{ marginBottom: 0 }}
-            />
+            <Space direction="vertical" size="small" style={{ width: "100%" }}>
+              <Alert
+                type="info"
+                showIcon
+                message="EmptyWorkingSet + Temp/Prefetch"
+                description="Windows API buông page RAM process > ngưỡng. Nút 'Dọn Temp' xóa %TEMP% + Prefetch. An toàn — không kill process nào."
+              />
+              <Space style={{ marginTop: 8 }}>
+                <Button
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  loading={cleaningTemp}
+                  onClick={doCleanTemp}
+                >
+                  Dọn Temp
+                </Button>
+                <Tooltip title="Tự động chạy mỗi 10s khi RAM < ngưỡng">
+                  <Switch size="small" checked={autoClean} onChange={setAutoClean} />
+                </Tooltip>
+              </Space>
+            </Space>
           </Col>
           <Col span={12} style={{ textAlign: "right" }}>
             <Space>

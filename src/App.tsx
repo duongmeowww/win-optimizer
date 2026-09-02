@@ -9,7 +9,7 @@ import MemoryCleaner from "./components/MemoryCleaner/MemoryCleaner";
 import ServicesStartup from "./components/ServicesStartup/ServicesStartup";
 import Gaming from "./components/Gaming/Gaming";
 import Diagnostics from "./components/Diagnostics/Diagnostics";
-import Settings from "./components/Settings/Settings";
+import AdvancedTools from "./components/Settings/AdvancedTools";
 
 function Loading() {
   return (
@@ -36,7 +36,7 @@ export default function App() {
                 <Route path="/services" element={<ServicesStartup />} />
                 <Route path="/gaming" element={<Gaming />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<AdvancedTools />} />
               </Routes>
             </Suspense>
           </main>
