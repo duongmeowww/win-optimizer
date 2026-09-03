@@ -9,6 +9,7 @@ pub mod advanced;
 pub mod debloat;
 pub mod services_startup;
 pub mod memory_cleaner;
+pub mod one_click;
 pub mod app_manager;
 pub mod duplicate_finder;
 pub mod registry_tweaks;

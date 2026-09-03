@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import HelpButton from "../Common/HelpButton";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { Button } from "antd";
 import {
   InfoCircleOutlined,
   ClockCircleOutlined,
@@ -18,6 +19,7 @@ import {
   DesktopOutlined,
   WarningOutlined,
   CheckCircleOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 
 interface DiskInfo {
@@ -140,17 +142,38 @@ export default function Dashboard() {
   const location = useLocation();
   const isActive = location.pathname === "/" || location.pathname === "/dashboard";
   const [info, setInfo] = useState<SystemInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ cpu: number[]; ram: number[]; disk: number[]; gpu: number[] }>({
-    cpu: [],
-    ram: [],
-    disk: [],
-    gpu: [],
-  });
-  const busyRef = useRef(false);
+     const [error, setError] = useState<string | null>(null);
+     const [history, setHistory] = useState<{ cpu: number[]; ram: number[]; disk: number[]; gpu: number[] }>({
+       cpu: [],
+       ram: [],
+       disk: [],
+       gpu: [],
+     });
+     const [optimizing, setOptimizing] = useState(false);
+     const [optimizeResult, setOptimizeResult] = useState<string | null>(null);
+     const busyRef = useRef(false);
   const mountedRef = useRef(true);
 
-  useEffect(() => {
+     const optimizeSystem = async () => {
+       setOptimizing(true);
+       setOptimizeResult(null);
+       try {
+         const [success, message] = await invoke<[boolean, string]>(
+           "one_click_optimize"
+         );
+         if (success) {
+           setOptimizeResult(`✅ Hoàn tất tối ưu hóa!\n\n${message}`);
+         } else {
+           setOptimizeResult(`❌ Lỗi khi tối ưu hóa:\n\n${message}`);
+         }
+       } catch (err) {
+         setOptimizeResult(`❌ Lỗi kết nối: ${err}`);
+       } finally {
+         setOptimizing(false);
+       }
+     };
+
+     useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
@@ -287,6 +310,15 @@ export default function Dashboard() {
             <div style={{ fontSize: 12, color: "#94a3b8" }}>Điểm sức khỏe</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#f8fafc" }}>{healthScore} / 100 điểm</div>
           </div>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            loading={optimizing}
+            onClick={optimizeSystem}
+            style={{ marginLeft: 16, height: 40, fontWeight: 600 }}
+          >
+            Tối ưu một phím
+          </Button>
         </div>
       </div>
 
