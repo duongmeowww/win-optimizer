@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, Button, Typography, Table, Tag, message, Spin } from "antd";
 import { RocketOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 const { Title, Text } = Typography;
 
@@ -98,7 +99,7 @@ export default function AdvancedHub() {
     <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
         <Title level={2} style={{ margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
-          <RocketOutlined style={{ color: "#fa8c16" }} /> Advanced Optimization Suite (Toàn bộ 8 tính năng)
+          <RocketOutlined style={{ color: "#fa8c16" }} /> Advanced Optimization Suite (Toàn bộ 8 tính năng) <HelpButton title="Advanced Suite" content="Tập hợp toàn bộ 8 tính năng nâng cao: Tối ưu GPU, bảo mật telemetry, quản lý Windows Update và Profile tự động."/>
         </Title>
         <Text type="secondary">
           Bao gồm GPU Scheduling, Telemetry Hardening, Smart Startup, Windows Update Controller, Benchmark và Profiles.

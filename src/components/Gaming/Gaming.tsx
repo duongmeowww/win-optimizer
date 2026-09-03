@@ -34,6 +34,7 @@ import {
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import HelpButton from "../Common/HelpButton";
 
 interface GamingTweak { id: string; label: string; desc: string; category: string; active: boolean; tradeoff: boolean; }
 interface GamingPreset { id: string; label: string; desc: string; aggressive: boolean; tweaks: string[]; active: boolean; active_count: number; total: number; }

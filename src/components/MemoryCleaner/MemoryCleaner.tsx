@@ -18,6 +18,7 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 export interface MemCleanResult {
   freed_kb: number;
@@ -124,6 +125,7 @@ export default function MemoryCleaner() {
           <Space>
             <ThunderboltOutlined />
             Dọn RAM Windows
+            <HelpButton title="Memory Cleaner" content="Giải phóng RAM trống, kết thúc các tiến trình chiếm dụng nhiều bộ nhớ, thiết lập tự động dọn RAM định kỳ."/>
           </Space>
         }
         extra={

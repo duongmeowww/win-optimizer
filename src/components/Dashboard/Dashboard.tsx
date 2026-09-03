@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import HelpButton from "../Common/HelpButton";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -275,7 +276,9 @@ export default function Dashboard() {
       {/* Header Banner */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#f8fafc" }}>Tổng quan hệ thống</h1>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#f8fafc" }}>
+            Tổng quan hệ thống <HelpButton title="Tổng quan hệ thống" content="Hiển thị điểm sức khỏe tổng thể của máy, dung lượng ổ cứng, thông tin GPU, RAM, CPU và các khuyến nghị tối ưu thông minh được cá nhân hóa cho máy của bạn." />
+          </h1>
           <p style={{ margin: "4px 0 0 0", color: "#94a3b8" }}>{info.os_version} · Hoạt động: {formatUptime(info.uptime_seconds)}</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, background: "rgba(255,255,255,0.03)", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>

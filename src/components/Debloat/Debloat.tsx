@@ -3,6 +3,7 @@ import { ReloadOutlined, DeleteOutlined, UndoOutlined, InfoCircleOutlined } from
 import { useTranslation } from "react-i18next";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 interface DebloatItem {
   id: string;
@@ -255,7 +256,7 @@ export default function Debloat() {
 
   return (
     <Card
-      title={t("nav.debloat", { defaultValue: "Debloat" })}
+      title={<Space>{t("nav.debloat", { defaultValue: "Debloat" })} <HelpButton title="Debloat" content="Gỡ bỏ các ứng dụng rác, telemetry và dịch vụ ngầm không cần thiết để tăng tốc hệ thống."/></Space>}
       extra={
         <Space>
           <Button

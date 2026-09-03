@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, Button, Input, Slider, Typography, message, Spin, Table, Tag } from "antd";
 import { FileSearchOutlined, DeleteOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 const { Title, Text } = Typography;
 
@@ -36,7 +37,7 @@ export default function DuplicateFinder() {
     <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
         <Title level={2} style={{ margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
-          <FileSearchOutlined style={{ color: "#1890ff" }} /> Tìm kiếm file trùng lặp
+          <FileSearchOutlined style={{ color: "#1890ff" }} /> Tìm kiếm file trùng lặp <HelpButton title="Tìm file trùng lặp" content="So sánh hash SHA-256 nội dung file để phát hiện chính xác file trùng lặp, hỗ trợ xem trước và xóa an toàn."/>
         </Title>
         <Text type="secondary">
           Quét và phát hiện các file trùng nội dung chính xác dựa trên thuật toán mã hóa SHA-256 để giải phóng dung lượng ổ cứng.

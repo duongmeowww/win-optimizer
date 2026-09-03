@@ -22,6 +22,7 @@ import {
   CopyOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 interface CleanCategory {
   id: string;
@@ -158,6 +159,7 @@ export default function DiskCleaner() {
           <Space>
             <ClearOutlined />
             Dọn rác Windows
+            <HelpButton title="Disk Cleaner" content="Quét và xóa file tạm, cache trình duyệt, file log và thùng rác để giải phóng dung lượng ổ đĩa."/>
           </Space>
         }
         extra={

@@ -8,6 +8,7 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 const { Text } = Typography;
 

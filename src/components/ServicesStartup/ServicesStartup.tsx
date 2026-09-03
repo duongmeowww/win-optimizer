@@ -3,6 +3,7 @@ import { ReloadOutlined, ThunderboltOutlined, ExclamationCircleOutlined } from "
 import { useTranslation } from "react-i18next";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import HelpButton from "../Common/HelpButton";
 
 interface ServiceStartupItem {
   id: string;
@@ -223,7 +224,7 @@ export default function ServicesStartup() {
 
   return (
     <Card
-      title={t("nav.services", { defaultValue: "Services & Startup" })}
+      title={<Space>{t("nav.services", { defaultValue: "Services & Startup" })} <HelpButton title="Services & Startup" content="Quản lý dịch vụ Windows và ứng dụng khởi động. Tắt các service không cần thiết giúp khởi động máy nhanh hơn."/></Space>}
       extra={
         <Space>
           <Button
