@@ -13,7 +13,9 @@ pub struct UpdateInfo {
 
 const REPO_OWNER: &str = "duongmeowww";
 const REPO_NAME: &str = "win-optimizer";
-const CURRENT_VERSION: &str = "0.4.1";
+
+/// Lấy version ngay từ Cargo.toml (compile-time) để luôn đồng bộ, tránh hardcode lệch bản.
+const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tauri::command]
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
