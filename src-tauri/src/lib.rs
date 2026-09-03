@@ -118,6 +118,7 @@ pub fn run() {
             commands::registry_tweaks::apply_registry_tweak,
             commands::advanced_hub::get_advanced_hub_modules,
             commands::advanced_hub::execute_advanced_hub_action,
+            commands::updater::check_for_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

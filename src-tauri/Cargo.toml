@@ -30,6 +30,7 @@ winreg = "0.56.0"
 futures = "0.3.34"
 sha2 = "0.10"
 walkdir = "2.5"
+reqwest = { version = "0.12", features = ["blocking", "json"], default-features = false }
 # lhm-sys = "0.1.1"  # Temporarily disabled to debug E0255
 
 [profile.release]

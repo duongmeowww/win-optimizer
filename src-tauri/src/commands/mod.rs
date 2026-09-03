@@ -13,6 +13,7 @@ pub mod app_manager;
 pub mod duplicate_finder;
 pub mod registry_tweaks;
 pub mod advanced_hub;
+pub mod updater;
 
 #[tauri::command]
 pub async fn run_benchmark() -> String {
