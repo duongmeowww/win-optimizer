@@ -5,13 +5,6 @@ use std::path::{Path, PathBuf};
 use sha2::{Sha256, Digest};
 
 #[derive(serde::Serialize, Clone)]
-pub struct DuplicateFile {
-    pub path: String,
-    pub size: u64,
-    pub hash: String,
-}
-
-#[derive(serde::Serialize, Clone)]
 pub struct DuplicateGroup {
     pub hash: String,
     pub size: u64,

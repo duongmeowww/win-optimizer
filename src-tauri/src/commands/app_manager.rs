@@ -1,6 +1,5 @@
 use crate::commands::gaming::ps_quiet;
 use tauri::async_runtime::spawn_blocking;
-use std::time::Duration;
 
 /// Một ứng dụng phổ biến có thể cài đặt qua Winget
 #[derive(serde::Serialize, Clone)]

@@ -47,62 +47,12 @@ const SERVICE_CATEGORIES: &[(&str, &str, &str)] = &[
     ("BITS", "System", "Background Intelligent Transfer Service."),
 ];
 
-/// Lấy trạng thái runtime của một service (Running/Stopped/Pending/Terminating...).
-fn service_status(name: &str) -> String {
-    let out = ps_quiet(
-        &format!(
-            r#"
-$ErrorActionPreference = 'SilentlyContinue'
-(Get-Service -Name '{}' -ErrorAction SilentlyContinue).Status
-"#,
-            name
-        ),
-        10,
-    );
-    let s = out.trim().to_string();
-    if s.is_empty() { "Unknown".to_string() } else { s }
-}
-
-/// Lấy StartType của một service (Auto/Demand/Disabled).
-fn service_start_type(name: &str) -> String {
-    let out = ps_quiet(
-        &format!(
-            r#"
-$ErrorActionPreference = 'SilentlyContinue'
-$svc = Get-CimInstance Win32_Service -Filter "Name='{0}'"
-if ($svc) {{ $svc.StartMode }} else {{ 'Unknown' }}
-"#,
-            name
-        ),
-        10,
-    );
-    let s = out.trim().to_string();
-    if s.is_empty() { "Unknown".to_string() } else { s }
-}
-
-/// Lấy DisplayName của một service (dành cho UI thân thiện).
-fn service_display_name(name: &str) -> String {
-    let out = ps_quiet(
-        &format!(
-            r#"
-$ErrorActionPreference = 'SilentlyContinue'
-$svc = Get-CimInstance Win32_Service -Filter "Name='{0}'"
-if ($svc) {{ $svc.DisplayName }} else {{ '{0}' }}
-"#,
-            name
-        ),
-        10,
-    );
-    let s = out.trim().to_string();
-    if s.is_empty() { name.to_string() } else { s }
-}
-
 /// Trả về danh sách dịch vụ được monitor + trạng thái startup hiện tại.
 /// Tối ưu: gộp 75 lần gọi PowerShell thành 1 lần duy nhất (~0.8s thay vì 30-40s)
 #[tauri::command]
 pub async fn get_service_startup_items() -> Vec<ServiceStartupItem> {
     spawn_blocking(|| {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         // Dedupe + giữ category/desc đầu tiên cho mỗi service
         let mut meta: HashMap<&str, (&str, &str)> = HashMap::new();
         let mut order: Vec<&str> = Vec::new();
