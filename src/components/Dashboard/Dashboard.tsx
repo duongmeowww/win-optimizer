@@ -14,12 +14,20 @@ import {
   ClearOutlined,
   ExperimentOutlined,
   SafetyOutlined,
+  DesktopOutlined,
+  WarningOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 
 interface DiskInfo {
   name: string;
   total_bytes: number;
   free_bytes: number;
+}
+
+interface GpuInfo {
+  name: string;
+  clock_mhz: number;
 }
 
 interface SystemInfo {
@@ -36,6 +44,7 @@ interface SystemInfo {
   gpu_clock_mhz: number;
   gpu_temp_c: number;
   gpu_usage: number;
+  gpu_list: GpuInfo[];
   os_version: string;
   uptime_seconds: number;
 }
@@ -53,7 +62,6 @@ function fmtGHz(mhz: number): string {
 
 const MAX_POINTS = 24;
 
-/* Smooth SVG sparkline */
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const w = 150;
   const h = 46;
@@ -86,7 +94,6 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-/* Circular progress ring */
 function Ring({ value, size = 128, stroke = 10, color, children }: any) {
   const pct = Math.max(0, Math.min(100, value));
   const r = (size - stroke) / 2;
@@ -200,188 +207,200 @@ export default function Dashboard() {
     );
   }
 
-  // Derived metrics
   const ramPct = info.ram_total ? Math.round((info.ram_used / info.ram_total) * 100) : 0;
   const diskUsed = info.disk_total - info.disk_free;
   const diskPct = info.disk_total ? Math.round((diskUsed / info.disk_total) * 100) : 0;
-  const gpuPct = Math.min(100, Math.round(info.gpu_usage || 0));
-  const health = Math.max(
-    0,
-    Math.min(100, 100 - Math.min(60, ramPct) - Math.max(0, diskPct - 70))
-  );
-  const uptimeH = Math.floor(info.uptime_seconds / 3600);
-  const uptimeM = Math.floor((info.uptime_seconds % 3600) / 60);
 
-  const cpuColor = "#38bdf8";
-  const ramColor = "#a78bfa";
-  const diskColor = "#fbbf24";
-  const gpuColor = "#34d399";
-  const healthColor = health > 70 ? "#34d399" : health > 40 ? "#fbbf24" : "#f87171";
+  // Tính điểm Sức khỏe (Health Score) động thông minh (0 - 100)
+  let healthScore = 100;
+  if (ramPct > 85) healthScore -= 25;
+  else if (ramPct > 70) healthScore -= 12;
 
-  // Recommendations (based on finished data)
-  const recommendations: { icon: React.ReactNode; title: string; desc: string; tag: string; tagStyle: any }[] = [];
-  if (diskPct >= 80) {
+  if (diskPct > 90) healthScore -= 25;
+  else if (diskPct > 80) healthScore -= 15;
+
+  if (info.cpu_usage > 80) healthScore -= 20;
+  else if (info.cpu_usage > 50) healthScore -= 10;
+  healthScore = Math.max(20, healthScore);
+
+  // Khuyến nghị thông minh động dựa trên phần cứng thực tế của máy
+  const recommendations: { title: string; desc: string; type: "warning" | "success" | "info" }[] = [];
+  
+  if (ramPct > 75) {
     recommendations.push({
-      icon: <ClearOutlined />,
-      title: "Dọn dẹp file rác",
-      desc: `Ổ đĩa đang đầy (${diskPct}%). Xóa file tạm & rác hệ thống.`,
-      tag: "Khuyến nghị",
-      tagStyle: { background: "rgba(34,211,238,0.12)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.3)" },
+      title: "RAM đang bị chiếm dụng cao",
+      desc: `Mức sử dụng RAM đã đạt ${ramPct}%. Hãy sử dụng tính năng Dọn RAM để giải phóng bớt bộ nhớ.`,
+      type: "warning",
+    });
+  } else {
+    recommendations.push({
+      title: "Bộ nhớ RAM ổn định",
+      desc: `RAM hoạt động mượt mà (${(info.ram_used / 1073741824).toFixed(1)}GB / ${(info.ram_total / 1073741824).toFixed(1)}GB).`,
+      type: "success",
     });
   }
-  if (ramPct >= 80) {
+
+  if (diskPct > 85) {
     recommendations.push({
-      icon: <ExperimentOutlined />,
-      title: "Giải phóng RAM",
-      desc: `RAM đang sử dụng ${ramPct}%. Giải phóng bộ nhớ hoạt động.`,
-      tag: "Khuyến nghị",
-      tagStyle: { background: "rgba(167,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.3)" },
+      title: "Ổ cứng gần đầy",
+      desc: `Dung lượng ổ đĩa đã dùng ${diskPct}%. Nên dọn dẹp file rác hoặc tìm file trùng lặp để giải phóng không gian.`,
+      type: "warning",
+    });
+  } else {
+    recommendations.push({
+      title: "Dung lượng ổ đĩa tối ưu",
+      desc: `Còn trống ${(info.disk_free / 1073741824).toFixed(1)} GB trên tổng số ổ đĩa hệ thống.`,
+      type: "success",
     });
   }
-  if (recommendations.length === 0) {
+
+  if (info.gpu_list && info.gpu_list.length > 1) {
     recommendations.push({
-      icon: <SafetyOutlined />,
-      title: "Hệ thống khỏe mạnh",
-      desc: "Chạy quét nhanh để kiểm tra toàn diện phần mềm không cần thiết.",
-      tag: "Ổn định",
-      tagStyle: { background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.3)" },
+      title: `Phát hiện ${info.gpu_list.length} Card đồ họa`,
+      desc: `Hệ thống có đa GPU (${info.gpu_list.map(g => g.name).join(" + ")}). Hãy đảm bảo game/app nặng sử dụng GPU rời để đạt hiệu năng cao nhất.`,
+      type: "info",
     });
   }
+
+  const formatUptime = (secs: number) => {
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    if (d > 0) return `${d} ngày ${h} giờ`;
+    return `${h} giờ ${m} phút`;
+  };
 
   return (
-    <div className="dash-root">
-      {/* Header */}
-      <div className="dash-header">
+    <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+      {/* Header Banner */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <h1 className="dash-title">Bảng điều khiển</h1>
-          <p className="dash-subtitle">{info.os_version}</p>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#f8fafc" }}>Tổng quan hệ thống</h1>
+          <p style={{ margin: "4px 0 0 0", color: "#94a3b8" }}>{info.os_version} · Hoạt động: {formatUptime(info.uptime_seconds)}</p>
         </div>
-        <div className="dash-uptime-badge">
-        <ClockCircleOutlined />
-          Hoạt động: {uptimeH}h {uptimeM}m
-        </div>
-      </div>
-
-      {/* Stats cards grid */}
-      <div className="stats-grid">
-        {/* CPU */}
-        <div className="stat-card stat-card-cpu">
-          <div className="stat-head">
-            <span className="stat-icon"><ControlOutlined /></span>
-            <span className="stat-name">CPU</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, background: "rgba(255,255,255,0.03)", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
+          <HeartOutlined style={{ fontSize: 28, color: healthScore > 75 ? "#52c41a" : healthScore > 50 ? "#faad14" : "#ff4d4f" }} />
+          <div>
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>Điểm sức khỏe</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#f8fafc" }}>{healthScore} / 100 điểm</div>
           </div>
-          <div className="stat-value">{info.cpu_usage.toFixed(1)}%</div>
-          <div className="stat-sub">{info.cpu_name || "N/A"}</div>
-          <div className="stat-chart"><Sparkline data={history.cpu} color={cpuColor} /></div>
-        </div>
-
-        {/* RAM */}
-        <div className="stat-card">
-          <div className="stat-head">
-            <span className="stat-icon"><DeploymentUnitOutlined /></span>
-            <span className="stat-name">RAM</span>
-          </div>
-          <div className="ring-wrap">
-            <Ring value={ramPct} color={ramColor}>
-              <div className="ring-num">{ramPct}%</div>
-              <div className="ring-cap">{fmtBytes(info.ram_used)}</div>
-            </Ring>
-          </div>
-          <div className="stat-cap">{fmtBytes(info.ram_used)} / {fmtBytes(info.ram_total)}</div>
-        </div>
-
-        {/* Disk */}
-        <div className="stat-card">
-          <div className="stat-head">
-            <span className="stat-icon"><HddOutlined /></span>
-            <span className="stat-name">Ổ Đĩa C:</span>
-          </div>
-          <div className="ring-wrap">
-            <Ring value={diskPct} color={diskColor}>
-              <div className="ring-num">{diskPct}%</div>
-              <div className="ring-cap">{fmtBytes(diskUsed)} đã dùng</div>
-            </Ring>
-          </div>
-          <div className="stat-cap">💾 Trống {fmtBytes(info.disk_free)}</div>
-        </div>
-
-        {/* GPU */}
-        <div className="stat-card stat-card-gpu">
-          <div className="stat-head">
-            <span className="stat-icon"><ExpandOutlined /></span>
-            <span className="stat-name">GPU</span>
-          </div>
-          <div className="stat-value">{gpuPct}%</div>
-          <div className="stat-sub">{info.gpu_name || "N/A"}</div>
-          <div className="stat-chart"><Sparkline data={history.gpu} color={gpuColor} /></div>
-        </div>
-
-        {/* Health */}
-        <div className="stat-card stat-card-health">
-          <div className="stat-head">
-            <span className="stat-icon"><HeartOutlined /></span>
-            <span className="stat-name">Điểm Sức Khỏe</span>
-          </div>
-          <div className="ring-wrap">
-            <Ring value={health} color={healthColor}>
-              <div className="ring-num">{health}</div>
-              <div className="ring-cap">/100</div>
-            </Ring>
-          </div>
-          <div className="stat-cap">{health > 70 ? "Tuyệt vời" : health > 40 ? "Khá ổn" : "Cần tối ưu"}</div>
         </div>
       </div>
 
-      {/* Bottom: report + tools */}
-      <div className="bottom-grid">
-        {/* Báo cáo chi tiết */}
-        <div className="panel">
-          <h3 className="panel-title"><BarChartOutlined style={{ color: "#22d3ee" }} /> Báo cáo chi tiết</h3>
-          <div className="report-grid">
-            <div className="report-item">
-              <span className="report-label">CPU tần số</span>
-              <span className="report-value">{fmtGHz(info.cpu_clock_mhz)}</span>
-            </div>
-            <div className="report-item">
-              <span className="report-label">CPU nhiệt độ</span>
-              <span className="report-value">{info.cpu_temp_c > 0 ? `${info.cpu_temp_c.toFixed(0)}°C` : "N/A"}</span>
-            </div>
-            <div className="report-item">
-              <span className="report-label">GPU</span>
-              <span className="report-value">{info.gpu_name || "N/A"}</span>
-            </div>
-            <div className="report-item">
-              <span className="report-label">GPU tần số</span>
-              <span className="report-value">{fmtGHz(info.gpu_clock_mhz)}</span>
-            </div>
-            <div className="report-item">
-              <span className="report-label">Hệ điều hành</span>
-              <span className="report-value">{info.os_version}</span>
-            </div>
-            <div className="report-item">
-              <span className="report-label">Uptime</span>
-              <span className="report-value">{uptimeH}h {uptimeM}m</span>
+      {/* Main CPU / RAM / GPU / Disk Meters */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
+        {/* CPU Card */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontWeight: 600, color: "#cbd5e1" }}>CPU Processor</span>
+            <span style={{ fontSize: 12, color: "#38bdf8" }}>{info.cpu_name}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Ring value={Math.round(info.cpu_usage)} color="#38bdf8">
+              <div style={{ textAlign: "center", paddingTop: 38 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>{Math.round(info.cpu_usage)}%</div>
+              </div>
+            </Ring>
+            <div style={{ flex: 1 }}>
+              <Sparkline data={history.cpu} color="#38bdf8" />
             </div>
           </div>
         </div>
 
-        {/* Công cụ khuyến nghị */}
-        <div className="panel">
-          <h3 className="panel-title"><BulbOutlined style={{ color: "#fbbf24" }} /> Công cụ khuyến nghị</h3>
-          <div className="rec-list">
-            {recommendations.slice(0, 3).map((r, i) => (
-              <div key={i} className="rec-item">
-                <div className="rec-icon">{r.icon}</div>
-                <div className="rec-body">
-                  <div className="rec-top">
-                    <span className="rec-title">{r.title}</span>
-                    <span className="rec-tag" style={r.tagStyle}>{r.tag}</span>
+        {/* RAM Card */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontWeight: 600, color: "#cbd5e1" }}>Bộ nhớ RAM</span>
+            <span style={{ fontSize: 12, color: "#a855f7" }}>{fmtBytes(info.ram_used)} / {fmtBytes(info.ram_total)}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Ring value={ramPct} color="#a855f7">
+              <div style={{ textAlign: "center", paddingTop: 38 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>{ramPct}%</div>
+              </div>
+            </Ring>
+            <div style={{ flex: 1 }}>
+              <Sparkline data={history.ram} color="#a855f7" />
+            </div>
+          </div>
+        </div>
+
+        {/* GPU Card */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontWeight: 600, color: "#cbd5e1" }}>Card đồ họa (GPU)</span>
+            <span style={{ fontSize: 12, color: "#10b981" }}>{info.gpu_list?.length || 1} GPU detected</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Ring value={Math.round(info.gpu_usage)} color="#10b981">
+              <div style={{ textAlign: "center", paddingTop: 38 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>{Math.round(info.gpu_usage)}%</div>
+              </div>
+            </Ring>
+            <div style={{ flex: 1 }}>
+              <Sparkline data={history.gpu} color="#10b981" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Multi-Disk & Multi-GPU Details Section */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        {/* Disks Detail */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+          <h3 style={{ margin: "0 0 14px 0", fontSize: 16, color: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
+            <HddOutlined style={{ color: "#60a5fa" }} /> Chi tiết ổ đĩa ({info.disk_info?.length || 0} ổ)
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {info.disk_info?.map((d, i) => {
+              const used = d.total_bytes - d.free_bytes;
+              const pct = d.total_bytes ? Math.round((used / d.total_bytes) * 100) : 0;
+              return (
+                <div key={i} style={{ background: "rgba(255,255,255,0.02)", padding: 12, borderRadius: 8, border: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 600, color: "#cbd5e1" }}>Ổ đĩa {d.name}</span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Trống {fmtBytes(d.free_bytes)} / {fmtBytes(d.total_bytes)} ({pct}%)</span>
                   </div>
-                  <p className="rec-desc">{r.desc}</p>
+                  <div style={{ width: "100%", background: "rgba(255,255,255,0.1)", height: 6, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, background: pct > 85 ? "#ef4444" : "#3b82f6", height: "100%" }} />
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* GPUs Detail */}
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+          <h3 style={{ margin: "0 0 14px 0", fontSize: 16, color: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
+            <DesktopOutlined style={{ color: "#34d399" }} /> Chi tiết Card đồ họa ({info.gpu_list?.length || 1} GPU)
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {info.gpu_list?.map((g, i) => (
+              <div key={i} style={{ background: "rgba(255,255,255,0.02)", padding: 12, borderRadius: 8, border: "1px solid rgba(255,255,255,0.04)" }}>
+                <div style={{ fontWeight: 600, color: "#cbd5e1", marginBottom: 4 }}>{g.name}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>Clock speed: {g.clock_mhz ? `${g.clock_mhz} MHz` : "N/A"}</div>
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Intelligent Recommendations */}
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 18 }}>
+        <h3 style={{ margin: "0 0 14px 0", fontSize: 16, color: "#f8fafc", display: "flex", alignItems: "center", gap: 8 }}>
+          <BulbOutlined style={{ color: "#facc15" }} /> Khuyến nghị tối ưu thông minh cho máy của bạn
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+          {recommendations.map((rec, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.02)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.04)", display: "flex", gap: 12, alignItems: "flex-start" }}>
+              {rec.type === "warning" ? <WarningOutlined style={{ fontSize: 18, color: "#f59e0b", marginTop: 2 }} /> : <CheckCircleOutlined style={{ fontSize: 18, color: "#10b981", marginTop: 2 }} />}
+              <div>
+                <div style={{ fontWeight: 600, color: "#f8fafc", marginBottom: 4 }}>{rec.title}</div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.4 }}>{rec.desc}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

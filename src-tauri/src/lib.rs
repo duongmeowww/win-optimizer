@@ -39,8 +39,8 @@ fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
     let mut child = match StdCommand::new(cmd)
         .args(args)
         .stdout(Stdio::piped())
-                .creation_flags(0x08000000)
-                .stderr(Stdio::null())
+        .creation_flags(0x08000000)
+        .stderr(Stdio::null())
         .spawn()
     {
         Ok(c) => c,
@@ -113,6 +113,11 @@ pub fn run() {
             commands::app_manager::is_available_for_install,
             commands::app_manager::install_app,
             commands::app_manager::uninstall_app,
+            commands::duplicate_finder::scan_duplicate_files,
+            commands::registry_tweaks::get_registry_tweaks,
+            commands::registry_tweaks::apply_registry_tweak,
+            commands::advanced_hub::get_advanced_hub_modules,
+            commands::advanced_hub::execute_advanced_hub_action,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

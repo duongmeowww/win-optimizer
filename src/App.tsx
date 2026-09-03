@@ -11,6 +11,9 @@ const ServicesStartup = lazy(() => import("./components/ServicesStartup/Services
 const Gaming = lazy(() => import("./components/Gaming/Gaming"));
 const Diagnostics = lazy(() => import("./components/Diagnostics/Diagnostics"));
 const AdvancedTools = lazy(() => import("./components/Settings/AdvancedTools"));
+const DuplicateFinder = lazy(() => import("./components/DuplicateFinder/DuplicateFinder"));
+const RegistryTweaks = lazy(() => import("./components/RegistryTweaks/RegistryTweaks"));
+const AdvancedHub = lazy(() => import("./components/AdvancedHub/AdvancedHub"));
 
 function Loading() {
   return (
@@ -37,7 +40,12 @@ export default function App() {
                 <Route path="/services" element={<ServicesStartup />} />
                 <Route path="/gaming" element={<Gaming />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
+                {/* Gộp: /settings, /registry, /hub cùng trỏ về trang Tinh chỉnh & Công cụ nâng cao */}
                 <Route path="/settings" element={<AdvancedTools />} />
+                <Route path="/registry" element={<RegistryTweaks />} />
+                <Route path="/hub" element={<AdvancedHub />} />
+                {/* Gộp: /duplicates nằm trong tab Dọn dẹp hệ thống */}
+                <Route path="/duplicates" element={<DuplicateFinder />} />
               </Routes>
             </Suspense>
           </main>

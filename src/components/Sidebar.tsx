@@ -7,18 +7,18 @@ import {
   SettingOutlined,
   PlayCircleOutlined,
   MedicineBoxOutlined,
-  ToolOutlined,
+  ControlOutlined,
 } from "@ant-design/icons";
 
 const NAV_ITEMS = [
   { key: "/", icon: <ThunderboltOutlined />, label: "Tối ưu hóa" },
-  { key: "/disk", icon: <ClearOutlined />, label: "Dọn dẹp nhanh" },
-  { key: "/debloat", icon: <SafetyOutlined />, label: "Debloat" },
+  { key: "/disk", icon: <ClearOutlined />, label: "Dọn dẹp hệ thống" },
+  { key: "/debloat", icon: <SafetyOutlined />, label: "Debloat & Ứng dụng" },
   { key: "/memory", icon: <ExperimentOutlined />, label: "Dọn RAM" },
   { key: "/services", icon: <SettingOutlined />, label: "Dịch vụ & Khởi động" },
-  { key: "/gaming", icon: <PlayCircleOutlined />, label: "Tối ưu Gaming" },
-  { key: "/diagnostics", icon: <MedicineBoxOutlined />, label: "Chẩn đoán & Sửa" },
-  { key: "/settings", icon: <ToolOutlined />, label: "Công cụ nâng cao" },
+  { key: "/gaming", icon: <PlayCircleOutlined />, label: "Tăng tốc Gaming" },
+  { key: "/diagnostics", icon: <MedicineBoxOutlined />, label: "Chẩn đoán & Sửa lỗi" },
+  { key: "/registry", icon: <ControlOutlined />, label: "Tinh chỉnh & Công cụ" },
 ];
 
 export default function Sidebar() {

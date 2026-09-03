@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   Table,
@@ -18,6 +19,7 @@ import {
   FundOutlined,
   ThunderboltOutlined,
   ReloadOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -54,10 +56,11 @@ export default function DiskCleaner() {
   const [scan, setScan] = useState<DiskCleanScan | null>(null);
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [bench, setBench] = useState<BenchResult | null>(null);
   const [benchLoading, setBenchLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [msg, msgCtx] = message.useMessage();
 
   const loadScan = useCallback(async () => {
@@ -159,6 +162,9 @@ export default function DiskCleaner() {
         }
         extra={
           <Space>
+            <Button icon={<CopyOutlined />} onClick={() => navigate("/duplicates")}>
+              Tìm file trùng lặp
+            </Button>
             <Button icon={<ReloadOutlined />} onClick={loadScan} loading={loading}>
               Quét lại
             </Button>

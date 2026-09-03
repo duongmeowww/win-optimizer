@@ -1,6 +1,7 @@
 use crate::commands::gaming::ps_quiet;
 use tauri::{AppHandle, Emitter};
 use std::process::Command;
+use std::os::windows::process::CommandExt;
 use std::sync::{Mutex, OnceLock};
 use winreg::enums::*;
 use winreg::RegKey;
@@ -20,6 +21,7 @@ pub fn relaunch_admin(app: AppHandle) -> Result<(), String> {
     // runas → UAC prompt
     let _ = Command::new("powershell")
         .args(["-Command", &format!("Start-Process -FilePath '{0}' -Verb RunAs", exe_str.replace('\'', "''"))])
+        .creation_flags(0x08000000)
         .spawn()
         .map_err(|e| e.to_string())?;
     // đóng instance hiện tại sau 1s

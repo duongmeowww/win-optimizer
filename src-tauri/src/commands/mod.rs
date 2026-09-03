@@ -9,6 +9,10 @@ pub mod advanced;
 pub mod debloat;
 pub mod services_startup;
 pub mod memory_cleaner;
+pub mod app_manager;
+pub mod duplicate_finder;
+pub mod registry_tweaks;
+pub mod advanced_hub;
 
 #[tauri::command]
 pub async fn run_benchmark() -> String {
@@ -67,6 +71,12 @@ pub struct DiskInfo {
     pub free_bytes: u64,
 }
 
+#[derive(serde::Serialize, Default, Clone)]
+pub struct GpuInfo {
+    pub name: String,
+    pub clock_mhz: u64,
+}
+
 #[derive(serde::Serialize, Default)]
 pub struct SystemInfo {
     pub cpu_usage: f64,
@@ -82,6 +92,7 @@ pub struct SystemInfo {
     pub gpu_clock_mhz: u64,
     pub gpu_temp_c: f64,
     pub gpu_usage: f64,
+    pub gpu_list: Vec<GpuInfo>,
     pub os_version: String,
     pub uptime_seconds: u64,
 }
@@ -97,6 +108,7 @@ struct SysSnapshot {
     disk_info: Vec<DiskInfo>,
     gpu_name: String,
     gpu_clock_mhz: u64,
+    gpu_list: Vec<GpuInfo>,
 }
 
 static SYS_SNAPSHOT: OnceLock<Mutex<SysSnapshot>> = OnceLock::new();
@@ -110,7 +122,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $os  = Get-CimInstance Win32_OperatingSystem
 $disks = Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'
-$gpus = Get-CimInstance Win32_VideoController | Select-Object Name, CurrentClockSpeed | Select-Object -First 1
+$gpus = Get-CimInstance Win32_VideoController | Select-Object Name, CurrentClockSpeed
 $dLines = @(); $dTotal = [uint64]0; $dFree = [uint64]0
 foreach ($d in $disks) {
     $t = [uint64]$d.Size; $f = [uint64]$d.FreeSpace
@@ -124,7 +136,9 @@ Write-Output "OS=$($os.Caption) $($os.Version)"
 Write-Output "UPTIME=$uptimeSec"
 foreach ($dl in $dLines) { Write-Output "DISK=$dl" }
 Write-Output "DISK_TOTAL=$dTotal"; Write-Output "DISK_FREE=$dFree"
-if ($gpus) { Write-Output "GPU=$($gpus.Name)|$($gpus.CurrentClockSpeed)" } else { Write-Output 'GPU=N/A|0' }
+if ($gpus) {
+    foreach ($g in $gpus) { Write-Output "GPU=$($g.Name)|$($g.CurrentClockSpeed)" }
+} else { Write-Output 'GPU=N/A|0' }
 "#
     ], PS_TIMEOUT);
 
@@ -138,6 +152,7 @@ if ($gpus) { Write-Output "GPU=$($gpus.Name)|$($gpus.CurrentClockSpeed)" } else 
         disk_info: Vec::new(),
         gpu_name: String::new(),
         gpu_clock_mhz: 0,
+        gpu_list: Vec::new(),
     };
     for line in ps.lines() {
         match line {
@@ -170,8 +185,16 @@ if ($gpus) { Write-Output "GPU=$($gpus.Name)|$($gpus.CurrentClockSpeed)" } else 
             }
             l if l.starts_with("GPU=") => {
                 let p: Vec<&str> = l[4..].split('|').collect();
-                s.gpu_name = p.first().map(|x| x.trim().to_string()).unwrap_or_default();
-                s.gpu_clock_mhz = p.get(1).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
+                let g_name = p.first().map(|x| x.trim().to_string()).unwrap_or_default();
+                let g_clock = p.get(1).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
+                if s.gpu_name.is_empty() {
+                    s.gpu_name = g_name.clone();
+                    s.gpu_clock_mhz = g_clock;
+                }
+                s.gpu_list.push(GpuInfo {
+                    name: g_name,
+                    clock_mhz: g_clock,
+                });
             }
             _ => {}
         }
@@ -192,6 +215,7 @@ pub async fn get_sys_info() -> SystemInfo {
             disk_info: Vec::new(),
             gpu_name: String::new(),
             gpu_clock_mhz: 0,
+            gpu_list: Vec::new(),
         }));
         let sys_mutex = SYS.get_or_init(|| Mutex::new(System::new()));
 
@@ -227,6 +251,7 @@ pub async fn get_sys_info() -> SystemInfo {
             gpu_clock_mhz: snap.gpu_clock_mhz,
             gpu_temp_c: 0.0,
             gpu_usage,
+            gpu_list: snap.gpu_list.clone(),
             os_version: snap.os_version.clone(),
             uptime_seconds,
         }
