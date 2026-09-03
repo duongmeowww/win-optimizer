@@ -1,6 +1,6 @@
 [package]
 name = "win-optimizer"
-version = "0.4.2"
+version = "0.4.3"
 description = "Windows Optimization App"
 authors = ["Dương"]
 edition = "2021"
