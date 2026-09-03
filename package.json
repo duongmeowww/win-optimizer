@@ -1,6 +1,6 @@
 {
   "name": "win-optimizer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Windows Optimization App",
   "main": "index.html",
   "scripts": {

@@ -11,7 +11,7 @@ pub struct UpdateInfo {
 
 const REPO_OWNER: &str = "duongmeowww";
 const REPO_NAME: &str = "win-optimizer";
-const CURRENT_VERSION: &str = "0.2.0";
+const CURRENT_VERSION: &str = "0.3.0";
 
 #[tauri::command]
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
