@@ -1,4 +1,5 @@
 use std::process::Command as StdCommand;
+use std::os::windows::process::CommandExt;
 use std::time::Duration;
 use sysinfo::System;
 
@@ -38,7 +39,8 @@ fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
     let mut child = match StdCommand::new(cmd)
         .args(args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+                .creation_flags(0x08000000)
+                .stderr(Stdio::null())
         .spawn()
     {
         Ok(c) => c,
@@ -76,7 +78,42 @@ fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![commands::get_sys_info, commands::get_disk_clean_candidates, commands::run_disk_clean, commands::run_benchmark, commands::clean_memory, commands::gaming::get_gaming_tweaks, commands::gaming::apply_gaming_tweak, commands::gaming_advanced::get_gaming_presets, commands::gaming_advanced::apply_gaming_preset, commands::gaming_advanced::start_gaming_session, commands::gaming_advanced::stop_gaming_session, commands::gaming_advanced::get_gaming_session, commands::gaming_advanced::set_game_profile, commands::gaming_advanced::get_game_profile, commands::gaming_advanced::verify_gaming_tweaks, commands::gaming_advanced::is_admin, commands::gaming_advanced::relaunch_admin, commands::diagnostics::repair_system_files, commands::diagnostics::run_chkdsk_scan, commands::diagnostics::get_recent_events, commands::diagnostics::get_drive_smart, commands::advanced::run_advanced_tool, commands::advanced::get_advanced_tools, commands::debloat::get_debloat_items, commands::debloat::apply_debloat, commands::debloat::apply_debloat_batch, commands::services_startup::get_service_startup_items, commands::services_startup::set_service_startup, commands::services_startup::optimize_recommended_services, commands::memory_cleaner::run_memory_cleaner])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_sys_info,
+            commands::get_disk_clean_candidates,
+            commands::run_disk_clean,
+            commands::run_benchmark,
+            commands::clean_memory,
+            commands::gaming::get_gaming_tweaks,
+            commands::gaming::apply_gaming_tweak,
+            commands::gaming_advanced::get_gaming_presets,
+            commands::gaming_advanced::apply_gaming_preset,
+            commands::gaming_advanced::start_gaming_session,
+            commands::gaming_advanced::stop_gaming_session,
+            commands::gaming_advanced::get_gaming_session,
+            commands::gaming_advanced::set_game_profile,
+            commands::gaming_advanced::get_game_profile,
+            commands::gaming_advanced::verify_gaming_tweaks,
+            commands::gaming_advanced::is_admin,
+            commands::gaming_advanced::relaunch_admin,
+            commands::diagnostics::repair_system_files,
+            commands::diagnostics::run_chkdsk_scan,
+            commands::diagnostics::get_recent_events,
+            commands::diagnostics::get_drive_smart,
+            commands::advanced::run_advanced_tool,
+            commands::advanced::get_advanced_tools,
+            commands::debloat::get_debloat_items,
+            commands::debloat::apply_debloat,
+            commands::debloat::apply_debloat_batch,
+            commands::services_startup::get_service_startup_items,
+            commands::services_startup::set_service_startup,
+            commands::services_startup::optimize_recommended_services,
+            commands::memory_cleaner::run_memory_cleaner,
+            commands::app_manager::get_popular_apps,
+            commands::app_manager::is_available_for_install,
+            commands::app_manager::install_app,
+            commands::app_manager::uninstall_app,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
