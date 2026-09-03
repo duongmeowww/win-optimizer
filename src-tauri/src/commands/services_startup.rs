@@ -32,7 +32,6 @@ const SERVICE_CATEGORIES: &[(&str, &str, &str)] = &[
     ("XboxGipSvc", "Gaming", "Xbox Game Input Service."),
     ("XblAuthManager", "Gaming", "Xbox Live Auth Manager."),
     ("XblGameSave", "Gaming", "Xbox Live Game Save."),
-    ("WerSvc", "Telemetry", "Windows Error Reporting."),
     ("OneSyncSvc", "Bloatware", "Sync Host — đồng bộ OneDrive/Contacts."),
     ("PimIndexMaintenanceSvc", "Bloatware", "Contact Data — đồng bộ danh bạ."),
     ("UnistoreSvc", "Bloatware", "User Data Access — đồng bộ dữ liệu người dùng."),
@@ -40,11 +39,9 @@ const SERVICE_CATEGORIES: &[(&str, &str, &str)] = &[
     ("Winmgmt", "Security", "Windows Management Instrumentation."),
     ("SecurityHealthService", "Security", "Windows Security Health."),
     ("wscsvc", "Security", "Security Center — giám sát bảo mật Windows."),
-    ("Audiosrv", "Gaming", "Windows Audio."),
     ("Schedule", "System", "Task Scheduler — lên lịch công việc nền."),
     ("SENS", "System", "System Event Notification Service."),
     ("EventLog", "System", "Windows Event Log."),
-    ("BITS", "System", "Background Intelligent Transfer Service."),
 ];
 
 /// Trả về danh sách dịch vụ được monitor + trạng thái startup hiện tại.
