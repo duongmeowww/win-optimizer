@@ -11,7 +11,7 @@ export default function HelpButton({ title, content }: HelpButtonProps) {
     Modal.info({
       title: `Hướng dẫn sử dụng: ${title}`,
       content: (
-        <div style={{ marginTop: 12, lineHeight: 1.6, color: "rgba(255,255,255,0.85)" }}>
+        <div style={{ marginTop: 12, lineHeight: 1.6, color: "#1e293b", fontSize: 14 }}>
           {content}
         </div>
       ),

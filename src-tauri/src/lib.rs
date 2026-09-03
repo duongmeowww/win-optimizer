@@ -76,6 +76,9 @@ fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Khắc phục triệt để hiện tượng chớp nháy giao diện (WebView2 flicker) trên Windows
+    std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-features=CalculateNativeWinOcclusion");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
