@@ -455,6 +455,7 @@ pub async fn clean_memory(threshold_mb: Option<u32>) -> MemCleanResult {
 async fn tauri_wrapper(threshold_mb: Option<u32>) -> Result<MemCleanResult, ()> {
     tauri::async_runtime::spawn_blocking(move || clean_memory_inner(threshold_mb))
         .await
+        .map_err(|_| ())
 }
 
 fn clean_memory_inner(threshold_mb: Option<u32>) -> MemCleanResult {
