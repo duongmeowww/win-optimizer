@@ -390,7 +390,7 @@ pub async fn run_disk_clean(ids: Vec<String>) -> u64 {
     for cat in &scan.categories {
         if !ids.contains(&cat.id) { continue; }
         if cat.path.is_empty() || cat.path == "Recycle Bin" || cat.path == "thumbcache files" { continue; }
-        let escaped = cat.path.replace('\\', "\\\\").replace('\'', "\\'");
+        let escaped = cat.path.replace('\'', "''");
         let ps = format!(
             r#"
             $p = '{}';
@@ -446,7 +446,18 @@ Get-Process | Where-Object {{ $_.WorkingSet64 -gt {}MB }} | ForEach-Object {{ $_
 }
 
 #[tauri::command]
-pub fn clean_memory(threshold_mb: Option<u32>) -> MemCleanResult {
+pub async fn clean_memory(threshold_mb: Option<u32>) -> MemCleanResult {
+    tauri_wrapper(threshold_mb)
+        .await
+        .unwrap_or_default()
+}
+
+async fn tauri_wrapper(threshold_mb: Option<u32>) -> Result<MemCleanResult, ()> {
+    tauri::async_runtime::spawn_blocking(move || clean_memory_inner(threshold_mb))
+        .await
+}
+
+fn clean_memory_inner(threshold_mb: Option<u32>) -> MemCleanResult {
     let threshold = threshold_mb.unwrap_or_else(|| 50u32);
     let before = mem_available_kb();
     let pids = heavy_pids(threshold as u64);

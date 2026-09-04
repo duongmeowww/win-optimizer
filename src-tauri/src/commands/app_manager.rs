@@ -156,6 +156,11 @@ pub async fn get_popular_apps() -> Vec<PopularApp> {
 
 /// Kiểm tra xem một ứng dụng có được cài đặt qua Winget không
 fn check_if_installed(id: &str) -> bool {
+    // Validate input to prevent command injection
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return false;
+    }
+
     // Sử dụng winget list --id <id> --output-format json và kiểm tra kết quả
     // Đối với mục đích này, chúng ta sẽ sử dụng một cách tiếp cận đơn giản hơn
     // Trong thực tế, nên gọi winget và parse output
@@ -166,6 +171,11 @@ fn check_if_installed(id: &str) -> bool {
 /// Kiểm tra xem một ứng dụng có sẵn để cài đặt qua Winget không
 #[tauri::command]
 pub async fn is_available_for_install(id: String) -> bool {
+    // Validate input to prevent command injection
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return false;
+    }
+
     spawn_blocking(move || {
         let out = ps_quiet(&format!("winget search --id \"{}\" --output-format json", id), 5);
         !out.trim().is_empty() && !out.contains("No packages found")
@@ -177,6 +187,11 @@ pub async fn is_available_for_install(id: String) -> bool {
 /// Cài đặt một ứng dụng qua Winget
 #[tauri::command]
 pub async fn install_app(id: String) -> Result<(bool, String), String> {
+    // Validate input to prevent command injection
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return Err("ID ứng dụng không hợp lệ".to_string());
+    }
+
     spawn_blocking(move || {
         // Kiểm tra quyền admin
         let is_admin = ps_quiet("(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)", 5);
@@ -204,6 +219,11 @@ pub async fn install_app(id: String) -> Result<(bool, String), String> {
 /// Gỡ cài đặt một ứng dụng qua Winget
 #[tauri::command]
 pub async fn uninstall_app(id: String) -> Result<(bool, String), String> {
+    // Validate input to prevent command injection
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+        return Err("ID ứng dụng không hợp lệ".to_string());
+    }
+
     spawn_blocking(move || {
         // Kiểm tra quyền admin
         let is_admin = ps_quiet("(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)", 5);

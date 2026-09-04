@@ -1,6 +1,4 @@
 use serde_json::Value;
-use std::process::Command;
-use std::os::windows::process::CommandExt;
 
 #[derive(serde::Serialize, Clone)]
 pub struct UpdateInfo {
@@ -21,25 +19,24 @@ const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let url = format!("https://api.github.com/repos/{}/{}/releases/latest", REPO_OWNER, REPO_NAME);
-        
-        // Sửa lệnh PowerShell chuẩn: pipe trực tiếp Invoke-RestMethod sang ConvertTo-Json
+
+        // Sửa lệnh PowerShell chuẩn: pipe trực tiếp Invoke-RestMethod sang ConvertTo-Json.
+        // Dùng sh_timeout để ép timeout tổng (20s) — tránh treo vô hạn nếu mạng chậm.
         let ps_cmd = format!(
-            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $response = Invoke-RestMethod -Uri '{}' -UserAgent 'WinOptimizer-App' -TimeoutSec 10; $response | ConvertTo-Json -Depth 5",
+            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $response = Invoke-RestMethod -Uri '{}' -UserAgent 'WinOptimizer-App' -TimeoutSec 10; if ($response) {{ $response | ConvertTo-Json -Depth 5 }}",
             url
         );
 
-        let output = Command::new("powershell")
-            .args(["-NoProfile", "-Command", &ps_cmd])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output()
-            .map_err(|e| format!("Không thể chạy PowerShell: {}", e))?;
+        let stdout = crate::sh_timeout(
+            "powershell",
+            &["-NoProfile", "-Command", &ps_cmd],
+            std::time::Duration::from_secs(20),
+        );
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Lỗi kết nối GitHub API qua PowerShell: {}", stderr.trim()));
+        if stdout.trim().is_empty() {
+            return Err("Không nhận được phản hồi từ GitHub API (timeout hoặc mạng lỗi).".into());
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let json: Value = serde_json::from_str(&stdout)
             .map_err(|e| format!("Lỗi phân tích JSON từ GitHub: {} (raw: {})", e, &stdout[..std::cmp::min(150, stdout.len())]))?;
 

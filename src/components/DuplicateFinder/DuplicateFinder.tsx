@@ -1,16 +1,22 @@
 import { useState } from "react";
 import { Card, Button, Input, Slider, Typography, message, Spin, Table, Tag } from "antd";
-import { FileSearchOutlined, DeleteOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { FileSearchOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import HelpButton from "../Common/HelpButton";
 
 const { Title, Text } = Typography;
 
+interface DuplicateGroup {
+  hash: string;
+  size: number;
+  files: string[];
+}
+
 export default function DuplicateFinder() {
   const [targetPath, setTargetPath] = useState("C:\\Users");
   const [minSizeMb, setMinSizeMb] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [resultText, setResultText] = useState<string | null>(null);
+  const [resultGroups, setResultGroups] = useState<DuplicateGroup[] | null>(null);
 
   const handleScan = async () => {
     if (!targetPath) {
@@ -18,13 +24,13 @@ export default function DuplicateFinder() {
       return;
     }
     setLoading(true);
-    setResultText(null);
+    setResultGroups(null);
     try {
-      const res = await invoke<string>("find_duplicate_files", {
-        paths: [targetPath],
-        minSizeKb: minSizeMb * 1024,
+      const res = await invoke<DuplicateGroup[]>("scan_duplicate_files", {
+        dir: targetPath,
+        minSizeMb: minSizeMb,
       });
-      setResultText(res);
+      setResultGroups(res);
       message.success("Quét hoàn tất!");
     } catch (err) {
       message.error("Lỗi khi quét file trùng lặp: " + err);
@@ -86,11 +92,56 @@ export default function DuplicateFinder() {
         </Card>
       )}
 
-      {resultText && !loading && (
-        <Card title="Kết quả quét" bordered={false} style={{ background: "rgba(255,255,255,0.02)" }}>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", fontFamily: "monospace", fontSize: 13, background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 8 }}>
-            {resultText}
-          </pre>
+      {resultGroups && !loading && (
+        <Card title={`Kết quả quét — ${resultGroups.length} nhóm trùng lặp`} bordered={false} style={{ background: "rgba(255,255,255,0.02)" }}>
+          {resultGroups.length === 0 ? (
+            <Text type="secondary">Không tìm thấy file trùng lặp nào.</Text>
+          ) : (
+            <Table
+              dataSource={resultGroups.map((g, i) => ({ ...g, key: i }))}
+              columns={[
+                {
+                  title: "Hash (SHA-256)",
+                  dataIndex: "hash",
+                  key: "hash",
+                  render: (hash: string) => <Text code>{hash}</Text>,
+                },
+                {
+                  title: "Kích thước",
+                  dataIndex: "size",
+                  key: "size",
+                  width: 140,
+                  render: (size: number) => {
+                    if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+                    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+                    if (size >= 1024) return `${(size / 1024).toFixed(2)} KB`;
+                    return `${size} B`;
+                  },
+                },
+                {
+                  title: "Số file",
+                  dataIndex: "files",
+                  key: "count",
+                  width: 80,
+                  render: (files: string[]) => <Tag color="blue">{files.length}</Tag>,
+                },
+                {
+                  title: "Đường dẫn file",
+                  dataIndex: "files",
+                  key: "files",
+                  render: (files: string[]) => (
+                    <div>
+                      {files.map((f, i) => (
+                        <div key={i} style={{ fontSize: 12, fontFamily: "monospace" }}>{f}</div>
+                      ))}
+                    </div>
+                  ),
+                },
+              ]}
+              pagination={false}
+              size="small"
+            />
+          )}
         </Card>
       )}
     </div>

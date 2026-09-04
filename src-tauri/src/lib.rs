@@ -5,32 +5,6 @@ use sysinfo::System;
 
 mod commands;
 
-#[derive(serde::Serialize, Default, Clone)]
-pub struct DiskInfo {
-    pub name: String,
-    pub total_bytes: u64,
-    pub free_bytes: u64,
-}
-
-#[derive(serde::Serialize, Default)]
-pub struct SystemInfo {
-    pub cpu_usage: f64,
-    pub cpu_name: String,
-    pub cpu_clock_mhz: u64,
-    pub cpu_temp_c: f64,
-    pub ram_total: u64,
-    pub ram_used: u64,
-    pub disk_total: u64,
-    pub disk_free: u64,
-    pub disk_info: Vec<DiskInfo>,
-    pub gpu_name: String,
-    pub gpu_clock_mhz: u64,
-    pub gpu_temp_c: f64,
-    pub gpu_usage: f64,
-    pub os_version: String,
-    pub uptime_seconds: u64,
-}
-
 fn sh_timeout(cmd: &str, args: &[&str], timeout: Duration) -> String {
     use std::io::Read;
     use std::process::Stdio;

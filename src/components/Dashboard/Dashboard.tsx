@@ -97,7 +97,15 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function Ring({ value, size = 128, stroke = 10, color, children }: any) {
+interface RingProps {
+  value: number;
+  size?: number;
+  stroke?: number;
+  color: string;
+  children?: React.ReactNode;
+}
+
+function Ring({ value, size = 128, stroke = 10, color, children }: RingProps) {
   const pct = Math.max(0, Math.min(100, value));
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;

@@ -99,7 +99,7 @@ pub async fn get_gaming_tweaks() -> Result<Vec<GamingTweak>, String> {
             GamingTweak { id: "net_throttle".into(), label: "Gỡ giới hạn Bandwidth".into(), desc: "NetworkThrottlingIndex = 0xffffffff — không trì hoãn gói mạng khi tải cao.".into(), category: "Network".into(), active: net_throttle, tradeoff: false },
             GamingTweak { id: "sys_resp".into(), label: "SystemResponsiveness = 0".into(), desc: "MMCSS nhường 100% CPU cho foreground game thay vì 20% cho background.".into(), category: "CPU".into(), active: sys_resp, tradeoff: false },
             GamingTweak { id: "ult_power".into(), label: "Ultimate Performance plan".into(), desc: "CPU không xuống xung giữa frame. Tạo bản sao plan Ultimate (không đụng plan gốc).".into(), category: "CPU".into(), active: ult_power, tradeoff: false },
-            GamingTweak { id: "vbs".into(), label: "Tắt VBS / HVCI".into(), desc: "+5-15% FPS. GÃY Valorant (Vanguard) & R6 (BattlEye) trên Win11 24H2+. Cần khởi động lại.".into(), category: "Trade-off".into(), active: vbs_off, tradeoff: true },
+            GamingTweak { id: "vbs".into(), label: "Tắt VBS / HVCI".into(), desc: "+5-15% FPS. Gãy Valorant (Vanguard) & R6 (BattlEye) trên Win11 24H2+. Cần khởi động lại.".into(), category: "Trade-off".into(), active: vbs_off, tradeoff: true },
             GamingTweak { id: "core_park".into(), label: "Tắt Core Parking".into(), desc: "Ép toàn bộ lõi CPU hoạt động — giảm latency task switching.".into(), category: "CPU".into(), active: false, tradeoff: false },
             GamingTweak { id: "hpet".into(), label: "Tắt HPET".into(), desc: "Dùng TSC thay HPET — giảm overhead timer, thường bớt input lag trên desktop.".into(), category: "CPU".into(), active: hpet_off, tradeoff: false },
             GamingTweak { id: "win32prio".into(), label: "Win32PrioritySeparation".into(), desc: "Foreground boost + short quantum — CPU ưu tiên game đang chạy, giảm task switch jitter.".into(), category: "CPU".into(), active: win32prio, tradeoff: false },
@@ -115,44 +115,70 @@ pub async fn get_gaming_tweaks() -> Result<Vec<GamingTweak>, String> {
 /// Chạy tweak theo action: "apply" | "revert". Trả (ok, message).
 #[tauri::command]
 pub async fn apply_gaming_tweak(id: String, action: String) -> Result<(bool, String), String> {
-    spawn_blocking(move || {
-        let script = match (id.as_str(), action.as_str()) {
-            ("hags", "apply") => r#"New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'HwSchMode' -Value 2 -Type DWord"#,
-            ("hags", "revert") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'HwSchMode' -Value 1 -Type DWord"#,
-            ("mpo", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Name 'OverlayTestMode' -Value 5 -Type DWord"#,
-            ("mpo", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Name 'OverlayTestMode' -ErrorAction SilentlyContinue"#,
-            ("game_mode", "apply") => r#"New-Item -Path 'HKCU:\Software\Microsoft\GameBar' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AutoGameModeEnabled' -Value 1 -Type DWord"#,
-            ("game_mode", "revert") => r#"Set-ItemProperty -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AutoGameModeEnabled' -Value 0 -Type DWord"#,
-            ("game_dvr", "apply") => r#"New-Item -Path 'HKCU:\System\GameConfigStore' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Value 2 -Type DWord; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_Enabled' -Value 0 -Type DWord"#,
-            ("game_dvr", "revert") => r#"Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Value 0 -Type DWord; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_Enabled' -Value 1 -Type DWord"#,
-            ("nagle", "apply") => r#"Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces' | ForEach-Object { Set-ItemProperty -Path $_.PSPath -Name 'TcpNoDelay' -Value 1 -Type DWord -ErrorAction SilentlyContinue }"#,
-            ("nagle", "revert") => r#"Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces' | ForEach-Object { Remove-ItemProperty -Path $_.PSPath -Name 'TcpNoDelay' -ErrorAction SilentlyContinue }"#,
-            ("net_throttle", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'NetworkThrottlingIndex' -Value 0xffffffff -Type DWord"#,
-            ("net_throttle", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'NetworkThrottlingIndex' -ErrorAction SilentlyContinue"#,
-            ("sys_resp", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'SystemResponsiveness' -Value 0 -Type DWord"#,
-            ("sys_resp", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'SystemResponsiveness' -ErrorAction SilentlyContinue"#,
-            ("ult_power", "apply") => r#"$schemes = powercfg /list; if (-not ($schemes -match 'e9a42b02-d5df-448d-aa00-03f14749eb61')) { powercfg /duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 | Out-Null }; powercfg /setactive e9a42b02-d5df-448d-aa00-03f14749eb61"#,
-            ("ult_power", "revert") => r#"powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e"#,
-            ("vbs", "apply") => "bcdedit /set hypervisorlaunchtype off",
-            ("vbs", "revert") => "bcdedit /set hypervisorlaunchtype auto",
-            ("core_park", "apply") => r#"powercfg /setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 100; powercfg /setdcvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 100; powercfg /setactive SCHEME_CURRENT"#,
-            ("core_park", "revert") => r#"powercfg /setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 5; powercfg /setdcvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 5; powercfg /setactive SCHEME_CURRENT"#,
-            ("hpet", "apply") => "bcdedit /set useplatformclock true",
-            ("hpet", "revert") => "bcdedit /deletevalue useplatformclock",
-            ("win32prio", "apply") => r#"New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Name 'Win32PrioritySeparation' -Value 38 -Type DWord"#,
-            ("win32prio", "revert") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Name 'Win32PrioritySeparation' -Value 2 -Type DWord"#,
-            ("mmcss", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Name 'Priority' -Value 6 -Type DWord; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Name 'GPU Priority' -Value 8 -Type DWord"#,
-            ("mmcss", "revert") => r#"$t='HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'; Set-ItemProperty -Path $t -Name 'Priority' -Value 2 -Type DWord; Set-ItemProperty -Path $t -Name 'GPU Priority' -Value 8 -Type DWord"#,
-            ("tdr", "apply") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'TdrDelay' -Value 10 -Type DWord"#,
-            ("tdr", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'TdrDelay' -ErrorAction SilentlyContinue"#,
-            ("mouse", "apply") => r#"New-Item -Path 'HKCU:\Control Panel\Mouse' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseSpeed' -Value 0; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold1' -Value 0; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold2' -Value 0"#,
-            ("mouse", "revert") => r#"Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseSpeed' -Value 1; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold1' -Value 6; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold2' -Value 10"#,
-            _ => return Err(format!("Không hỗ trợ: {} / {}", id, action)),
-        };
+    spawn_blocking(move || apply_gaming_tweak_sync(id, action))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        let _out = ps_quiet(script, 10);
-        Ok((true, format!("{} '{}' xong.", if action == "apply" { "Bật" } else { "Tắt" }, id)))
-    })
-    .await
-    .map_err(|e| e.to_string())?
+/// Phiên bản sync của apply_gaming_tweak — dùng trong ngữ cảnh đã nằm trong spawn_blocking
+/// để tránh block_on lồng nhau gây deadlock.
+pub(crate) fn apply_gaming_tweak_sync(id: String, action: String) -> Result<(bool, String), String> {
+    let script = match (id.as_str(), action.as_str()) {
+        ("hags", "apply") => r#"New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'HwSchMode' -Value 2 -Type DWord"#,
+        ("hags", "revert") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'HwSchMode' -Value 1 -Type DWord"#,
+        ("mpo", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Name 'OverlayTestMode' -Value 5 -Type DWord"#,
+        ("mpo", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Dwm' -Name 'OverlayTestMode' -ErrorAction SilentlyContinue"#,
+        ("game_mode", "apply") => r#"New-Item -Path 'HKCU:\Software\Microsoft\GameBar' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AutoGameModeEnabled' -Value 1 -Type DWord"#,
+        ("game_mode", "revert") => r#"Set-ItemProperty -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AutoGameModeEnabled' -Value 0 -Type DWord"#,
+        ("game_dvr", "apply") => r#"New-Item -Path 'HKCU:\System\GameConfigStore' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Value 2 -Type DWord; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_Enabled' -Value 0 -Type DWord"#,
+        ("game_dvr", "revert") => r#"Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_FSEBehaviorMode' -Value 0 -Type DWord; Set-ItemProperty -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_Enabled' -Value 1 -Type DWord"#,
+        ("nagle", "apply") => r#"Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces' | ForEach-Object { Set-ItemProperty -Path $_.PSPath -Name 'TcpNoDelay' -Value 1 -Type DWord -ErrorAction SilentlyContinue }"#,
+        ("nagle", "revert") => r#"Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces' | ForEach-Object { Remove-ItemProperty -Path $_.PSPath -Name 'TcpNoDelay' -ErrorAction SilentlyContinue }"#,
+        ("net_throttle", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'NetworkThrottlingIndex' -Value 0xffffffff -Type DWord"#,
+        ("net_throttle", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'NetworkThrottlingIndex' -ErrorAction SilentlyContinue"#,
+        ("sys_resp", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'SystemResponsiveness' -Value 0 -Type DWord"#,
+        ("sys_resp", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile' -Name 'SystemResponsiveness' -ErrorAction SilentlyContinue"#,
+        ("ult_power", "apply") => r#"$schemes = powercfg /list; if (-not ($schemes -match 'e9a42b02-d5df-448d-aa00-03f14749eb61')) { powercfg /duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 | Out-Null }; powercfg /setactive e9a42b02-d5df-448d-aa00-03f14749eb61"#,
+        ("ult_power", "revert") => r#"powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e"#,
+        ("vbs", "apply") => "bcdedit /set hypervisorlaunchtype off",
+        ("vbs", "revert") => "bcdedit /set hypervisorlaunchtype auto",
+        ("core_park", "apply") => r#"powercfg /setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 100; powercfg /setdcvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 100; powercfg /setactive SCHEME_CURRENT"#,
+        ("core_park", "revert") => r#"powercfg /setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 5; powercfg /setdcvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c 5; powercfg /setactive SCHEME_CURRENT"#,
+        ("hpet", "apply") => "bcdedit /set useplatformclock true",
+        ("hpet", "revert") => "bcdedit /deletevalue useplatformclock",
+        ("win32prio", "apply") => r#"New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Name 'Win32PrioritySeparation' -Value 38 -Type DWord"#,
+        ("win32prio", "revert") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' -Name 'Win32PrioritySeparation' -Value 2 -Type DWord"#,
+        ("mmcss", "apply") => r#"New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Name 'Priority' -Value 6 -Type DWord; Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games' -Name 'GPU Priority' -Value 8 -Type DWord"#,
+        ("mmcss", "revert") => r#"$t='HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'; Set-ItemProperty -Path $t -Name 'Priority' -Value 2 -Type DWord; Set-ItemProperty -Path $t -Name 'GPU Priority' -Value 8 -Type DWord"#,
+        ("tdr", "apply") => r#"Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'TdrDelay' -Value 10 -Type DWord"#,
+        ("tdr", "revert") => r#"Remove-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'TdrDelay' -ErrorAction SilentlyContinue"#,
+        ("mouse", "apply") => r#"New-Item -Path 'HKCU:\Control Panel\Mouse' -Force | Out-Null; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseSpeed' -Value 0; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold1' -Value 0; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold2' -Value 0"#,
+        ("mouse", "revert") => r#"Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseSpeed' -Value 1; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold1' -Value 6; Set-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -Name 'MouseThreshold2' -Value 10"#,
+        _ => return Err(format!("Không hỗ trợ: {} / {}", id, action)),
+    };
+
+    let _out = ps_quiet(script, 10);
+    Ok((true, format!("{} '{}' xong.", if action == "apply" { "Bật" } else { "Tắt" }, id)))
+}
+
+/// Trả về label của tweak theo id (cho preset progress).
+pub(crate) fn tweak_label(id: &str) -> String {
+    match id {
+        "hags" => "HAGS (GPU Scheduling)".into(),
+        "mpo" => "Tắt MPO (Multiplane Overlay)".into(),
+        "game_mode" => "Game Mode".into(),
+        "game_dvr" => "Tắt Game DVR / recording".into(),
+        "nagle" => "Tắt Nagle's Algorithm".into(),
+        "net_throttle" => "Gỡ giới hạn Bandwidth".into(),
+        "sys_resp" => "SystemResponsiveness = 0".into(),
+        "ult_power" => "Ultimate Performance plan".into(),
+        "vbs" => "Tắt VBS / HVCI".into(),
+        "core_park" => "Tắt Core Parking".into(),
+        "hpet" => "Tắt HPET".into(),
+        "win32prio" => "Win32PrioritySeparation".into(),
+        "mmcss" => "MMCSS Games".into(),
+        "tdr" => "Tăng TDR delay".into(),
+        "mouse" => "Tắt Mouse Acceleration".into(),
+        _ => id.to_string(),
+    }
 }

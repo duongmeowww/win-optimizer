@@ -117,6 +117,14 @@ foreach ($n in $names) {{
 /// Trả về (ok, message).
 #[tauri::command]
 pub async fn set_service_startup(name: String, start_type: String) -> Result<(bool, String), String> {
+    // Validate inputs to prevent PowerShell injection
+    if !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        return Err("Tên service không hợp lệ".into());
+    }
+    if !matches!(start_type.as_str(), "Auto" | "Demand" | "Disabled") {
+        return Err("start_type không hợp lệ".into());
+    }
+
     let script = format!(
         r#"
 $ErrorActionPreference = 'SilentlyContinue'

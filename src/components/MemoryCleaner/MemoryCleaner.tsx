@@ -108,7 +108,7 @@ export default function MemoryCleaner() {
   useEffect(() => {
     if (!autoClean) return;
     const t = setInterval(() => {
-      if (bench && bench.ram_available_mb < threshold / 1024) {
+      if (bench && bench.ram_available_mb < threshold) {
         doClean();
       }
       runBench();

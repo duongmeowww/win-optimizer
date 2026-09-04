@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, Button, Typography, Switch, Table, Tag, message, Spin, Badge, Modal } from "antd";
-import { SettingOutlined, SafetyCertificateOutlined, DownloadOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { SettingOutlined, DownloadOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 
 const { Title, Text } = Typography;
@@ -29,7 +29,7 @@ export default function RegistryTweaks() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
-  const fetchTweaks = async () => {
+  const fetchTweaks = useCallback(async () => {
     setLoading(true);
     try {
       const res = await invoke<TweakItem[]>("get_registry_tweaks");
@@ -39,9 +39,9 @@ export default function RegistryTweaks() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const checkUpdate = async () => {
+  const checkUpdate = useCallback(async () => {
     setCheckingUpdate(true);
     try {
       const res = await invoke<UpdateInfo>("check_for_update");
@@ -56,12 +56,12 @@ export default function RegistryTweaks() {
     } finally {
       setCheckingUpdate(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTweaks();
     checkUpdate();
-  }, []);
+  }, [fetchTweaks, checkUpdate]);
 
   const handleToggle = async (id: string, currentEnabled: boolean) => {
     setUpdatingId(id);
@@ -116,7 +116,7 @@ export default function RegistryTweaks() {
       title: "Trạng thái / Thao tác",
       key: "action",
       width: 150,
-      render: (_: any, record: TweakItem) => (
+      render: (_: unknown, record: TweakItem) => (
         <Switch
           checked={record.enabled}
           loading={updatingId === record.id}

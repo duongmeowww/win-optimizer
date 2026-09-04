@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, Button, Typography, Table, Tag, message, Spin } from "antd";
 import { RocketOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
@@ -19,7 +19,7 @@ export default function AdvancedHub() {
   const [loading, setLoading] = useState(false);
   const [executingId, setExecutingId] = useState<string | null>(null);
 
-  const fetchModules = async () => {
+  const fetchModules = useCallback(async () => {
     setLoading(true);
     try {
       const res = await invoke<HubModule[]>("get_advanced_hub_modules");
@@ -29,11 +29,11 @@ export default function AdvancedHub() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchModules();
-  }, []);
+  }, [fetchModules]);
 
   const handleExecute = async (id: string) => {
     setExecutingId(id);
@@ -82,7 +82,7 @@ export default function AdvancedHub() {
       title: "Thao tác",
       key: "action",
       width: 160,
-      render: (_: any, record: HubModule) => (
+      render: (_: unknown, record: HubModule) => (
         <Button
           type="primary"
           ghost

@@ -36,21 +36,21 @@ pub fn run_chkdsk_scan() -> DiagResult {
 /// Đọc event log gần đây: crash app, service lỗi, DCOM — trả top N dòng.
 #[tauri::command]
 pub fn get_recent_events(limit: Option<u32>) -> DiagResult {
-    let _n = limit.unwrap_or(20).min(50);
-    let ps = r#"
+    let n = limit.unwrap_or(20).min(50);
+    let ps = format!(r#"
 $ErrorActionPreference = 'SilentlyContinue'
 $rows = @()
 # Application errors (crash) 24h
-Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2; StartTime=(Get-Date).AddHours(-24)} -MaxEvents 20 -ErrorAction SilentlyContinue |
-    Select-Object TimeCreated, Id, ProviderName, @{n='Msg';e={ ($_.Message -split "`n")[0] }} |
-    ForEach-Object { $rows += "[ERR] $($_.TimeCreated.ToString('HH:mm')) #$($_.Id) $($_.ProviderName): $($_.Msg)" }
+Get-WinEvent -FilterHashtable @{{LogName='Application'; Level=2; StartTime=(Get-Date).AddHours(-24)}} -MaxEvents {0} -ErrorAction SilentlyContinue |
+    Select-Object TimeCreated, Id, ProviderName, @{{n='Msg';e={{ ($_.Message -split "`n")[0] }}}} |
+    ForEach-Object {{ $rows += "[ERR] $($_.TimeCreated.ToString('HH:mm')) #$($_.Id) $($_.ProviderName): $($_.Msg)" }}
 # System errors 24h
-Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)} -MaxEvents 20 -ErrorAction SilentlyContinue |
-    Select-Object TimeCreated, Id, ProviderName, @{n='Msg';e={ ($_.Message -split "`n")[0] }} |
-    ForEach-Object { $rows += "[SYS] $($_.TimeCreated.ToString('HH:mm')) #$($_.Id) $($_.ProviderName): $($_.Msg)" }
-if ($rows.Count -eq 0) { 'Không có lỗi nghiêm trọng nào trong 24h.' } else { $rows | Select-Object -First 30 }
-"#;
-    let out = sh_timeout("powershell", &["-NoProfile", "-Command", ps], Duration::from_secs(60));
+Get-WinEvent -FilterHashtable @{{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)}} -MaxEvents {0} -ErrorAction SilentlyContinue |
+    Select-Object TimeCreated, Id, ProviderName, @{{n='Msg';e={{ ($_.Message -split "`n")[0] }}}} |
+    ForEach-Object {{ $rows += "[SYS] $($_.TimeCreated.ToString('HH:mm')) #$($_.Id) $($_.ProviderName): $($_.Msg)" }}
+if ($rows.Count -eq 0) {{ 'Không có lỗi nghiêm trọng nào trong 24h.' }} else {{ $rows | Select-Object -First 30 }}
+"#, n);
+    let out = sh_timeout("powershell", &["-NoProfile", "-Command", &ps], Duration::from_secs(60));
     DiagResult { action: "events".into(), output: out.clone(), ok: !out.trim().is_empty() }
 }
 

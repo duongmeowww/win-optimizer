@@ -95,21 +95,17 @@ pub async fn apply_gaming_preset(app: AppHandle, id: String, action: String) -> 
         let mut fails: Vec<String> = Vec::new();
         let total = tweaks.len();
         for (i, tid) in tweaks.iter().enumerate() {
-            let r = futures::executor::block_on(super::gaming::apply_gaming_tweak(tid.clone(), action_inner.clone()));
+            // Gọi trực tiếp logic sync (tránh block_on lồng nhau từng bị nợ deadlock)
+            let r = crate::commands::gaming::apply_gaming_tweak_sync(tid.clone(), action_inner.clone());
             let success = r.is_ok();
-            
-            // Get label from async context
-            let t_list = futures::executor::block_on(super::gaming::get_gaming_tweaks());
-            let t_label = t_list.ok()
-                .and_then(|list| list.into_iter().find(|t| t.id == *tid).map(|t| t.label))
-                .unwrap_or_else(|| tid.clone());
+            let tweak_label = super::gaming::tweak_label(tid);
 
             let _ = app.emit("preset-progress", serde_json::json!({
                 "index": i + 1,
                 "total": total,
                 "id": tid,
                 "ok": success,
-                "label": t_label,
+                "label": tweak_label,
                 "msg": r.map(|(_, m)| m).unwrap_or_else(|e| e),
             }));
             if success { ok += 1; } else { fails.push(tid.clone()); }

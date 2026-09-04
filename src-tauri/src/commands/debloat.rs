@@ -289,7 +289,7 @@ Get-AppxPackage | Select-Object -ExpandProperty Name -ErrorAction SilentlyContin
     out.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
 }
 fn contains_appx(names: &[String], q: &str) -> bool {
-    names.iter().any(|n| n == q)
+    names.iter().any(|n| n.contains(q))
 }
 
 /// Remove một AppX package by family name (non-admin, user-scoped).
