@@ -82,6 +82,10 @@ pub async fn get_gaming_tweaks() -> Result<Vec<GamingTweak>, String> {
             out.contains("useplatformclock") && out.contains("yes")
         };
 
+        let core_park = {
+            let out = ps_quiet("powercfg /query SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-881a-dec4282d1b8c", 5).to_lowercase();
+            out.contains("0x64") || out.contains("100")
+        };
         let win32prio = reg_val_native(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\PriorityControl", "Win32PrioritySeparation") == "38";
         let mmcss = {
             let v = reg_val_native(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "Priority");
@@ -100,7 +104,7 @@ pub async fn get_gaming_tweaks() -> Result<Vec<GamingTweak>, String> {
             GamingTweak { id: "sys_resp".into(), label: "SystemResponsiveness = 0".into(), desc: "MMCSS nhường 100% CPU cho foreground game thay vì 20% cho background.".into(), category: "CPU".into(), active: sys_resp, tradeoff: false },
             GamingTweak { id: "ult_power".into(), label: "Ultimate Performance plan".into(), desc: "CPU không xuống xung giữa frame. Tạo bản sao plan Ultimate (không đụng plan gốc).".into(), category: "CPU".into(), active: ult_power, tradeoff: false },
             GamingTweak { id: "vbs".into(), label: "Tắt VBS / HVCI".into(), desc: "+5-15% FPS. Gãy Valorant (Vanguard) & R6 (BattlEye) trên Win11 24H2+. Cần khởi động lại.".into(), category: "Trade-off".into(), active: vbs_off, tradeoff: true },
-            GamingTweak { id: "core_park".into(), label: "Tắt Core Parking".into(), desc: "Ép toàn bộ lõi CPU hoạt động — giảm latency task switching.".into(), category: "CPU".into(), active: false, tradeoff: false },
+            GamingTweak { id: "core_park".into(), label: "Tắt Core Parking".into(), desc: "Ép toàn bộ lõi CPU hoạt động — giảm latency task switching.".into(), category: "CPU".into(), active: core_park, tradeoff: false },
             GamingTweak { id: "hpet".into(), label: "Tắt HPET".into(), desc: "Dùng TSC thay HPET — giảm overhead timer, thường bớt input lag trên desktop.".into(), category: "CPU".into(), active: hpet_off, tradeoff: false },
             GamingTweak { id: "win32prio".into(), label: "Win32PrioritySeparation".into(), desc: "Foreground boost + short quantum — CPU ưu tiên game đang chạy, giảm task switch jitter.".into(), category: "CPU".into(), active: win32prio, tradeoff: false },
             GamingTweak { id: "mmcss".into(), label: "MMCSS Games (độ ưu tiên multimedia)".into(), desc: "MMCSS ưu tiên Game thread lên 6/8 — giảm stutter khi load background.".into(), category: "CPU".into(), active: mmcss, tradeoff: false },
@@ -157,7 +161,17 @@ pub(crate) fn apply_gaming_tweak_sync(id: String, action: String) -> Result<(boo
         _ => return Err(format!("Không hỗ trợ: {} / {}", id, action)),
     };
 
-    let _out = ps_quiet(script, 10);
+    // Chạy lệnh & kiểm tra lỗi thật (access denied, not found, etc.)
+    let out = ps_quiet(script, 10);
+    let lowered = out.to_lowercase();
+    if lowered.contains("access denied")
+        || lowered.contains("not found")
+        || lowered.contains("cannot find")
+        || lowered.contains("error:")
+    {
+        let msg = if out.trim().is_empty() { "Lệnh không trả kết quả — có thể thiếu quyền admin.".into() } else { out };
+        return Err(format!("{} '{}' thất bại: {}", if action == "apply" { "Bật" } else { "Tắt" }, id, msg));
+    }
     Ok((true, format!("{} '{}' xong.", if action == "apply" { "Bật" } else { "Tắt" }, id)))
 }
 

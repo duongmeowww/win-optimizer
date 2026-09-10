@@ -107,11 +107,19 @@ export default function MemoryCleaner() {
   // Auto-clean every 10 seconds if enabled and RAM below threshold
   useEffect(() => {
     if (!autoClean) return;
-    const t = setInterval(() => {
+    let cleaning = false;
+    const t = setInterval(async () => {
+      if (cleaning) return; // skip if a clean is still running
       if (bench && bench.ram_available_mb < threshold) {
-        doClean();
+        cleaning = true;
+        try {
+          await doClean();
+        } finally {
+          cleaning = false;
+        }
+      } else {
+        runBench();
       }
-      runBench();
     }, 10000);
     return () => clearInterval(t);
   }, [autoClean, bench, threshold, doClean, runBench]);
@@ -147,8 +155,8 @@ export default function MemoryCleaner() {
                     RAM available hiện tại
                   </Space>
                 }
-                value={bench ? bench.ram_available_mb * 1024 * 1024 : 0}
-                formatter={(v) => fmtMB(Number(v) / 1024)}
+                value={bench ? bench.ram_available_mb : 0}
+                formatter={(v) => fmtMB(Number(v) * 1024)}
                 loading={benchLoading}
                 valueStyle={{ color: bench && bench.ram_available_mb > 1024 ? "#34d399" : "#f87171" }}
               />

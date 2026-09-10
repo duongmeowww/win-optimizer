@@ -38,7 +38,7 @@ WinOptimizer provides a complete suite of Windows system optimization tools, inc
 
 1. Clone repository:
    ```bash
-   git clone https://github.com/duongmeogww/win-optimizer.git
+   git clone https://github.com/duongmeowww/win-optimizer.git
    cd win-optimizer
    ```
 
@@ -162,19 +162,9 @@ Advanced optimization tools:
 
 ## 📸 Screenshots
 
-### Dashboard
-![Dashboard](screenshots/dashboard.png)
+> Screenshots will be added in a future release.
 
-### Debloat
-![Debloat](screenshots/debloat.png)
-
-### Gaming Mode
-![Gaming Mode](screensscreens/gaming.png)
-
-### Memory Cleaner
-![Memory Cleaner](screenshots/memory-cleaner.png)
-
-## �Licensing
+## Licensing
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
